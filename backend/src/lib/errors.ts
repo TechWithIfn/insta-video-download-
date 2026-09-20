@@ -27,10 +27,12 @@ export const ERRORS: Record<ErrorCode, { message: string; status: number; retrya
   INVALID_URL: {
     message: "The URL provided is not a valid Instagram link.",
     status: 400,
+    retryable: false,
   },
   UNSUPPORTED_URL: {
     message: "This Instagram URL pattern is not yet supported.",
     status: 400,
+    retryable: false,
   },
   CONTENT_NOT_FOUND: {
     message:
