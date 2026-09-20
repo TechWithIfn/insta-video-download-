@@ -1,26 +1,22 @@
 {
-  "name": "ig-saver",
+  "name": "snapsave",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+  "engines": {
+    "node": ">=20"
   },
-  "dependencies": {
-    "next": "16.3.5",
-    "react": "19.2.8",
-    "react-dom": "19.2.8"
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build",
+    "test": "cd backend && npm test",
+    "lint:frontend": "cd frontend && npm run lint",
+    "install:all": "cd frontend && npm install && cd ../backend && npm install"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.3.5",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "concurrently": "^9.1.0"
   }
 }
