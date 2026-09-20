@@ -12,17 +12,15 @@ import { getProvider } from "./lib/providers/index.js";
 const app = express();
 const PORT = parseInt(process.env.PORT || "3001", 10);
 
-if (process.env.NODE_ENV === "production") {
-  const required = ["CORS_ORIGIN"];
-  const missing = required.filter((v) => !process.env[v]);
-  if (missing.length > 0) {
-    logger.error(`Missing required environment variables: ${missing.join(", ")}`);
-    process.exit(1);
-  }
-}
+const corsOrigins = (process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  origin: corsOrigins.length > 0 && !corsOrigins.includes("*")
+    ? corsOrigins
+    : true,
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type"],
 }));
