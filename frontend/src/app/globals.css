@@ -133,43 +133,10 @@
   background: radial-gradient(circle, rgba(139, 92, 246, 0.04) 0%, transparent 70%);
 }
 
-/* Fallback: OS-level dark mode if no data-theme is set */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0e0c1b;
-    --bg-elevated: rgba(255, 255, 255, 0.05);
-    --fg: #f4f3fa;
-    --fg-muted: #a9a8bc;
-    --fg-subtle: #6c6a80;
-    --border: rgba(255, 255, 255, 0.08);
-    --border-light: rgba(255, 255, 255, 0.06);
-    --card: rgba(255, 255, 255, 0.05);
-    --card-hover: rgba(255, 255, 255, 0.08);
-    --primary: #a17dff;
-    --primary-hover: #b89cff;
-    --primary-light: rgba(161, 125, 255, 0.15);
-    --primary-faint: rgba(161, 125, 255, 0.08);
-    --accent: #f479c0;
-    --accent-hover: #f9a0d4;
-    --accent-light: rgba(244, 121, 192, 0.15);
-    --brand-orange: #ffaa7a;
-    --accent-tint-purple: rgba(161, 125, 255, 0.12);
-    --accent-tint-purple-border: rgba(161, 125, 255, 0.25);
-    --accent-tint-orange: rgba(255, 170, 122, 0.14);
-    --accent-tint-orange-border: rgba(255, 170, 122, 0.25);
-    --success: #34d399;
-    --success-light: #0d2818;
-    --danger: #f87171;
-    --danger-light: #2d1215;
-    --dark: #0f172a;
-    --dark-elevated: #1e293b;
-    --dark-muted: #94a3b8;
-    --focus-ring: rgba(161, 125, 255, 0.4);
-    --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.25);
-    --shadow-card-hover: 0 12px 36px rgba(0, 0, 0, 0.30);
-    --shadow-brand: 0 10px 30px rgba(124, 77, 245, 0.18);
-  }
-}
+/* NOTE: no prefers-color-scheme fallback here on purpose.
+   Light Mode is the unconditional default; Dark Mode activates only from
+   an explicit saved user choice (data-theme="dark"). */
+
 
 *,
 *::before,

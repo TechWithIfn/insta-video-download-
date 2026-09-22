@@ -12,7 +12,8 @@ function getInitialTheme(): "light" | "dark" {
     const stored = localStorage.getItem("snapsave-theme") as "light" | "dark" | null;
     if (stored === "light" || stored === "dark") return stored;
   } catch {}
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  // No saved preference: ALWAYS Light Mode. System/OS theme is ignored.
+  return "light";
 }
 
 export default function Header() {

@@ -56,9 +56,11 @@ export default function RootLayout({
             __html: `
               (function(){
                 try {
+                  // Dark Mode ONLY on explicit saved user choice.
+                  // No saved preference (or anything else) => Light Mode.
+                  // System/OS theme is deliberately ignored.
                   var t = localStorage.getItem('snapsave-theme');
-                  var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  if (t === 'dark' || (!t && d)) {
+                  if (t === 'dark') {
                     document.documentElement.setAttribute('data-theme','dark');
                   } else {
                     document.documentElement.setAttribute('data-theme','light');
