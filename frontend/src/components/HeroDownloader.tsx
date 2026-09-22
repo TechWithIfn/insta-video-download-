@@ -82,20 +82,7 @@ function formatTime(seconds: number): string {
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = totalSeconds % 60;
   if (hours > 0) return `${hours}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return "Original";
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ["KB", "MB", "GB"];
-  let value = bytes / 1024;
-  let unit = units[0];
-  for (let index = 1; value >= 1024 && index < units.length; index++) {
-    value /= 1024;
-    unit = units[index];
-  }
-  return `${value.toFixed(value >= 10 ? 0 : 1)} ${unit}`;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
 function sanitizeHandle(username: string | null | undefined): string {
@@ -271,6 +258,7 @@ function VideoPlayer({ src, poster, mediaType, onDurationChange }: { src: string
           playsInline
           preload="metadata"
           className="absolute inset-0 h-full w-full object-contain"
+          onClick={togglePlay}
         />
 
         {!playing && (
@@ -572,11 +560,6 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   }, [firstMedia, streamSrc, logPreviewDiag]);
 
   // Derived metadata for the new two-column card
-  const resolution = firstMedia?.width && firstMedia?.height ? `${firstMedia.width} × ${firstMedia.height}` : firstMedia?.type === "video" ? "1080 × 1920" : "—";
-  const [loadedDuration, setLoadedDuration] = useState(0);
-  const apiDuration = firstMedia?.duration;
-  const resolvedDuration = typeof apiDuration === "number" && Number.isFinite(apiDuration) && apiDuration > 0 ? apiDuration : loadedDuration;
-  const durationLabel = resolvedDuration > 0 ? formatTime(resolvedDuration) : "—";
   const previewRef = useRef<HTMLDivElement>(null);
   const handlePreview = useCallback(() => {
     const v = previewRef.current?.querySelector<HTMLVideoElement>("video");
@@ -593,10 +576,6 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
     }
     previewRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, []);
-
-  const metaLabel = isAudio ? t.result.metaAudio : firstMedia?.type === "image" ? t.typeBadges.photo : t.result.metaVideo;
-  const formatLabel = isAudio ? "MP3" : firstMedia?.type === "image" ? "JPG" : "MP4";
-  const qualityLabel = "HD";
 
   return (
     <div className="result-card animate-fade-in-up mx-auto mt-6 w-[calc(100%-32px)] max-w-[900px] sm:mt-10 sm:w-full sm:px-5">
@@ -629,13 +608,13 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
         </div>
 
         {result.title && (
-          <p className="px-1 pb-3 text-[13px] leading-[1.5] text-fg-muted line-clamp-2 break-words">
+          <p className="result-title px-1 pb-3 text-[13px] leading-[1.5] text-fg-muted break-words">
             {decodeHtmlEntities(result.title)}
           </p>
         )}
 
         {/* ── Two-column body: LEFT preview / RIGHT info ── */}
-        <div className="result-grid grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,0.9fr)_minmax(280px,1.1fr)] md:gap-6">
+        <div className="result-grid grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,1fr)] lg:gap-6">
           {/* LEFT: large preview */}
           <div ref={previewRef} className="result-video-wrap min-w-0">
             {isAudio ? (
@@ -666,7 +645,6 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
                 src={streamSrc}
                 poster={firstMedia.thumbnail || undefined}
                 mediaType={firstMedia.type}
-                onDurationChange={setLoadedDuration}
               />
             ) : imgFailed ? (
               <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-black/5">
@@ -688,45 +666,8 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
             )}
           </div>
 
-          {/* RIGHT: information + actions */}
+          {/* Actions */}
           <div className="result-details flex min-w-0 flex-col gap-3 md:gap-4">
-            <div className="result-info rounded-[18px] p-4" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
-              <div className="flex items-center gap-2">
-                <span
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-white"
-                  style={{ background: "var(--brand-gradient)" }}
-                >
-                  {isAudio ? <Music className="h-4 w-4" /> : <Film className="h-4 w-4" />}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[14px] font-bold leading-none text-fg">{isAudio ? t.result.audio : "Video"}</p>
-                  <p className="mt-1 text-[12px] font-semibold tracking-wide text-fg-subtle">
-                    {formatLabel} • {qualityLabel}
-                  </p>
-                </div>
-              </div>
-
-              <div className="result-stats mt-4 grid gap-2">
-                <div className="result-stat rounded-xl bg-card px-3 py-2.5" style={{ border: "1px solid var(--border)" }}>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-fg-subtle">Resolution</p>
-                  <p className="mt-1 break-words text-[clamp(0.8rem,1.5vw,0.875rem)] font-bold text-fg">{resolution}</p>
-                </div>
-                <div className="result-stat rounded-xl bg-card px-3 py-2.5" style={{ border: "1px solid var(--border)" }}>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-fg-subtle">Size</p>
-                  <p className="mt-1 break-words text-[clamp(0.8rem,1.5vw,0.875rem)] font-bold text-fg">{firstMedia?.size != null ? formatBytes(firstMedia.size) : "Original"}</p>
-                </div>
-                <div className="result-stat rounded-xl bg-card px-3 py-2.5" style={{ border: "1px solid var(--border)" }}>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-fg-subtle">Duration</p>
-                  <p className="mt-1 break-words text-[clamp(0.8rem,1.5vw,0.875rem)] font-bold text-fg">{durationLabel}</p>
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-card px-2.5 py-2 text-xs font-medium text-fg-muted" style={{ border: "1px solid var(--border)" }}>
-                {isAudio ? <Music className="h-3.5 w-3.5 shrink-0 text-primary" /> : <Film className="h-3.5 w-3.5 shrink-0 text-primary" />}
-                <span className="truncate">{metaLabel}</span>
-              </div>
-            </div>
-
             <div className="result-actions flex flex-col gap-2.5 sm:flex-row">
               <button
                 type="button"

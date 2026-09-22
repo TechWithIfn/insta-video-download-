@@ -817,3 +817,149 @@ svg {
     padding-top: max(0.75rem, var(--sat));
   }
 }
+
+/* Result preview layout */
+.result-card {
+  width: min(calc(100% - 32px), 980px);
+  padding: clamp(12px, 2vw, 20px);
+}
+
+.result-grid {
+  align-items: start;
+}
+
+.result-video-wrap {
+  align-self: start;
+}
+
+.result-video-wrap .media-frame {
+  width: min(100%, 340px);
+  max-height: 520px;
+  margin-inline: auto;
+}
+
+.result-details {
+  height: fit-content;
+}
+
+.result-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 1023.98px) {
+  .result-video-wrap {
+    max-width: 360px;
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .result-card {
+    width: calc(100% - 32px);
+    padding: 10px;
+  }
+
+  .result-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .result-details {
+    display: contents;
+  }
+
+  .result-info {
+    order: 3;
+    padding: 12px !important;
+    border-radius: 14px !important;
+  }
+
+  .result-video-wrap {
+    order: 1;
+    width: 100%;
+    max-width: none;
+    margin-inline: 0;
+  }
+
+  .result-video-wrap .media-frame {
+    width: clamp(200px, 58vw, 240px);
+    max-height: none;
+    margin-inline: auto;
+  }
+
+  .result-info .result-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 10px !important;
+  }
+
+  .result-info .result-stat {
+    display: block;
+    min-width: 0;
+    padding: 8px 10px !important;
+  }
+
+  .result-info .result-stat > :last-child {
+    margin-top: 2px;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+
+  .result-actions {
+    order: 2;
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    gap: 8px;
+    margin-top: 0;
+  }
+
+  .result-actions > * {
+    min-height: 44px;
+    min-width: 0;
+    padding-inline: 10px;
+  }
+
+  .result-actions + p {
+    order: 4;
+    margin-top: 0;
+  }
+
+  .result-top-row {
+    margin-bottom: 8px !important;
+  }
+
+  .result-title {
+    margin-bottom: 0.25rem;
+    overflow-wrap: anywhere;
+  }
+
+  .result-card > div > p {
+    padding-bottom: 8px;
+  }
+
+  .result-info p {
+    max-width: 100%;
+  }
+
+  .result-info .result-stat p {
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 379.98px) {
+  .result-info .result-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .result-details {
+    display: flex;
+  }
+
+  .result-video-wrap .media-frame {
+    width: min(100%, 380px);
+  }
+}
