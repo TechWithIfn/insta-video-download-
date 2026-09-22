@@ -655,6 +655,37 @@ export class PuppeteerProvider extends BaseProvider {
               // Response body may not be available
             }
           }
+
+          // Media-delivery diagnostics (dev only via logger.debug): surface
+          // any response that looks like actual video bytes being delivered.
+          // Hostname only — never query strings or tokens.
+          try {
+            const req = typeof res.request === "function" ? res.request() : null;
+            const resourceType =
+              req && typeof req.resourceType === "function" ? req.resourceType() : "unknown";
+            const ctLower = resContentType.toLowerCase();
+            const statusCode = typeof res.status === "function" ? res.status() : -1;
+            const looksLikeMedia =
+              resourceType === "media" ||
+              ctLower.startsWith("video/") ||
+              (ctLower.includes("octet-stream") && /fbcdn|cdninstagram|scontent/i.test(resUrl));
+            if (looksLikeMedia) {
+              let host: string | null = null;
+              try {
+                host = new URL(resUrl).hostname;
+              } catch {
+                host = null;
+              }
+              logger.debug("[SnapSave Puppeteer Media Debug] media response", {
+                host,
+                resourceType,
+                status: statusCode,
+                contentType: resContentType.slice(0, 80),
+              });
+            }
+          } catch {
+            /* diagnostics must never break interception */
+          }
         } catch {
           // Ignore response processing errors
         }
@@ -688,6 +719,22 @@ export class PuppeteerProvider extends BaseProvider {
         )
         .catch(() => {});
       timings.dataWaitMs = Date.now() - waitStart;
+
+      // Bounded settle window: if no media response was captured yet, allow
+      // late network responses / late video elements a short extra window
+      // instead of inspecting too early. Strictly bounded — never indefinite.
+      if (interceptedMedia.length === 0) {
+        const settleStart = Date.now();
+        const SETTLE_BUDGET_MS = 2000;
+        while (Date.now() - settleStart < SETTLE_BUDGET_MS) {
+          const hasVideoEl = await page
+            .evaluate(`!!document.querySelector("video")`)
+            .catch(() => true);
+          if (hasVideoEl || interceptedMedia.length > 0) break;
+          await new Promise((r) => setTimeout(r, 250));
+        }
+        timings.settleMs = Date.now() - settleStart;
+      }
 
       // Check page state
       const pageState = await page.evaluate(PAGE_STATE_FN).catch(() => ({
@@ -734,6 +781,27 @@ export class PuppeteerProvider extends BaseProvider {
         // DOM extraction failed
       }
 
+      // Inspect actual <video> elements: currentSrc (not just the src
+      // attribute) reveals blob:-based playback; poster is logged as a
+      // boolean only. Hostnames only — never query strings or tokens.
+      try {
+        const videoDetails = (await page
+          .evaluate(
+            `Array.from(document.querySelectorAll("video")).slice(0, 5).map((v) => { var host = null; try { var u = new URL(v.currentSrc); host = u.protocol === "blob:" ? ("blob:" + u.hostname) : u.hostname; } catch (e) { host = null; } return { hasSrcAttr: !!v.getAttribute("src"), currentSrcHost: host, hasPoster: !!v.getAttribute("poster") }; })`
+          )
+          .catch(() => [])) as Array<{
+          hasSrcAttr: boolean;
+          currentSrcHost: string | null;
+          hasPoster: boolean;
+        }>;
+        logger.debug("[SnapSave Puppeteer Media Debug] video elements", {
+          count: videoDetails.length,
+          details: videoDetails,
+        });
+      } catch {
+        /* diagnostics must never break extraction */
+      }
+
       // Also try to extract from rendered HTML
       let renderedHtmlMedia: ExtractedMedia[] = [];
       try {
@@ -774,6 +842,15 @@ export class PuppeteerProvider extends BaseProvider {
         addUnique({ url: fetchMeta.ogImage, type: "image", width: null, height: null });
       }
 
+      logger.debug("[SnapSave Puppeteer Media Debug] candidates", {
+        intercepted: interceptedMedia.length,
+        renderedHtml: renderedHtmlMedia.length,
+        domVideos: domResult.videos.length,
+        domImages: domResult.images.length,
+        combined: allMedia.length,
+        videoCandidates: allMedia.filter((m) => m.type === "video").length,
+      });
+
       // Validate and filter
       const validMedia: MediaItem[] = [];
       for (const item of allMedia) {
@@ -796,10 +873,6 @@ export class PuppeteerProvider extends BaseProvider {
       }
 
       if (validMedia.length === 0) {
-        if (fetchMeta.ogImage) {
-          return this.buildResultFromMetadata(url, fetchMeta);
-        }
-
         logger.error("Puppeteer NO_MEDIA_FOUND", {
           url,
           interceptedCount: interceptedMedia.length,
@@ -808,6 +881,15 @@ export class PuppeteerProvider extends BaseProvider {
           renderedHtmlMediaCount: renderedHtmlMedia.length,
           duration: Date.now() - startTime,
         });
+        // A Reel/TV page with no discoverable video must NEVER degrade into
+        // a fake photo result — surface an honest diagnostic error instead.
+        const noVideoKind = this.detectContentType(url);
+        if (noVideoKind === "REEL" || noVideoKind === "VIDEO") {
+          throw createError("VIDEO_SOURCE_NOT_FOUND");
+        }
+        if (fetchMeta.ogImage) {
+          return this.buildResultFromMetadata(url, fetchMeta);
+        }
         throw createError("CONTENT_UNAVAILABLE");
       }
 
@@ -839,6 +921,7 @@ export class PuppeteerProvider extends BaseProvider {
       logger.info("Puppeteer resolve SUCCESS", {
         mediaCount: validMedia.length,
         hasVideo: validMedia.some((m) => m.type === "video"),
+        selectedType: orderedMedia[0]?.type ?? null,
         contentType,
         duration: Date.now() - startTime,
       });
@@ -900,6 +983,11 @@ export class PuppeteerProvider extends BaseProvider {
     }
 
     if (media.length === 0) {
+      // Same honesty rule as the main path: never fake a photo for a Reel.
+      const fallbackKind = this.detectContentType(url);
+      if (fallbackKind === "REEL" || fallbackKind === "VIDEO") {
+        throw createError("VIDEO_SOURCE_NOT_FOUND");
+      }
       throw createError("CONTENT_UNAVAILABLE");
     }
 

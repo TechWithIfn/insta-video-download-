@@ -39,6 +39,16 @@ describe("createError", () => {
     expect(response.success).toBe(false);
     expect(response.error.code).toBe("CONTENT_NOT_FOUND");
   });
+
+  it("maps VIDEO_SOURCE_NOT_FOUND to a retryable honest error", () => {
+    const error = createError("VIDEO_SOURCE_NOT_FOUND");
+    expect(error.statusCode).toBe(502);
+    const response = error.toResponse();
+    expect(response.success).toBe(false);
+    expect(response.error.code).toBe("VIDEO_SOURCE_NOT_FOUND");
+    expect(response.error.retryable).toBe(true);
+    expect(response.error.message).toBeTruthy();
+  });
 });
 
 describe("createErrorResponse", () => {

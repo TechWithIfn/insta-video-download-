@@ -145,6 +145,12 @@ export const ERRORS: Record<ErrorCode, { message: string; status: number; retrya
     status: 413,
     retryable: false,
   },
+  VIDEO_SOURCE_NOT_FOUND: {
+    message:
+      "The video for this Reel could not be loaded. Instagram may be restricting automated access right now. Please try again shortly.",
+    status: 502,
+    retryable: true,
+  },
 };
 
 export function createError(code: ErrorCode): AppError {
