@@ -75,7 +75,7 @@ export const en: Strings = {
       },
       {
         title: "Paste it here",
-        desc: "Drop the link into SnapSave. One paste is all it takes — no complicated setup.",
+        desc: "Drop the link into Downloadit. One paste is all it takes — no complicated setup.",
       },
       {
         title: "Preview and save",
@@ -129,7 +129,7 @@ export const en: Strings = {
     ],
   },
   why: {
-    eyebrow: "Why SnapSave",
+    eyebrow: "Why Downloadit",
     title: "Built for simplicity",
     subtitle: "Everything you need, nothing you don't.",
     items: [
@@ -173,8 +173,8 @@ export const en: Strings = {
     subtitle: "Quick answers to what people usually ask.",
     items: [
       {
-        q: "Does SnapSave require login?",
-        a: "No. SnapSave works with public links only — no account, login, or password needed.",
+        q: "Does Downloadit require login?",
+        a: "No. Downloadit works with public links only — no account, login, or password needed.",
       },
       {
         q: "Which Instagram links are supported?",
@@ -185,7 +185,7 @@ export const en: Strings = {
         a: "Files are saved to your device's default downloads folder — just like any browser download.",
       },
       {
-        q: "Is the media stored on SnapSave?",
+        q: "Is the media stored on Downloadit?",
         a: "No. Media is streamed directly and not permanently stored. Temporary links expire quickly, so download while available.",
       },
       {
@@ -198,7 +198,7 @@ export const en: Strings = {
       },
       {
         q: "How does Audio mode work?",
-        a: "Select the Audio tab, paste a public video link, and SnapSave extracts the audio as an MP3 using server-side processing.",
+        a: "Select the Audio tab, paste a public video link, and Downloadit extracts the audio as an MP3 using server-side processing.",
       },
     ],
   },
@@ -246,21 +246,21 @@ export const en: Strings = {
       disclaimer: "Disclaimer",
     },
     disclaimer:
-      "SnapSave is not affiliated with Instagram or Meta. Only download content you have the right to save.",
+      "Downloadit is not affiliated with Instagram or Meta. Only download content you have the right to save.",
     rights: "All rights reserved.",
     madeWith: "Made with ♥ for a simpler web.",
-    homeLabel: "SnapSave home",
+    homeLabel: "Downloadit home",
   },
   help: {
-    metaTitle: "Help & Guide | SnapSave",
+    metaTitle: "Help & Guide | Downloadit",
     metaDesc:
-      "Learn how to use SnapSave, troubleshoot common download issues, and find answers to frequently asked questions.",
+      "Learn how to use Downloadit, troubleshoot common download issues, and find answers to frequently asked questions.",
     title: "How can we help?",
-    subtitle: "Everything you need to know about using SnapSave.",
+    subtitle: "Everything you need to know about using Downloadit.",
     s1title: "Getting started",
     steps: [
       "Copy the URL of publicly accessible Instagram content.",
-      "Open SnapSave in your browser.",
+      "Open Downloadit in your browser.",
       "Select the right content type tab if needed.",
       "Paste the URL into the input box.",
       'Click "Get Media".',
@@ -270,16 +270,16 @@ export const en: Strings = {
     s2title: "Supported content",
     s2note:
       "Availability depends on whether the content is publicly accessible and supported by the current backend. Not every Instagram URL will work, and private content is never supported.",
-    s3title: "How SnapSave works",
+    s3title: "How Downloadit works",
     s3desc:
-      "Paste a link and SnapSave detects the content, shows you a preview, and lets you download it. Everything happens through public links — no login needed.",
+      "Paste a link and Downloadit detects the content, shows you a preview, and lets you download it. Everything happens through public links — no login needed.",
     flow: ["Link", "Content Detection", "Media Preview", "Download"],
     s4title: "Audio download",
     s4steps: [
       "Select the Audio tab.",
       "Paste a supported public video URL.",
       'Click "Get Media".',
-      "SnapSave processes the available video.",
+      "Downloadit processes the available video.",
       "Audio becomes available when server-side processing is ready.",
       "Download the MP3 file.",
     ],
@@ -295,7 +295,7 @@ export const en: Strings = {
       },
       {
         q: "Why can't I download private content?",
-        a: "SnapSave only supports publicly accessible content and never bypasses private restrictions. Never share your Instagram password or session cookies.",
+        a: "Downloadit only supports publicly accessible content and never bypasses private restrictions. Never share your Instagram password or session cookies.",
       },
       {
         q: "Why is audio extraction unavailable?",
@@ -308,7 +308,7 @@ export const en: Strings = {
     ],
     s6title: "Privacy & safety",
     privacy: [
-      "SnapSave never asks for your Instagram password.",
+      "Downloadit never asks for your Instagram password.",
       "Only download content you are authorized to use.",
       "Private access controls are never bypassed.",
       "Media links may be temporary.",
@@ -316,7 +316,7 @@ export const en: Strings = {
     ],
     s7title: "Frequently asked questions",
     faq: [
-      { q: "Is SnapSave free?", a: "Yes, SnapSave is free to use." },
+      { q: "Is Downloadit free?", a: "Yes, Downloadit is free to use." },
       {
         q: "Do I need an Instagram login?",
         a: "No. Everything works through public links with no login.",
@@ -343,13 +343,13 @@ export const en: Strings = {
       },
       {
         q: "Is my Instagram password required?",
-        a: "Never. SnapSave will never ask for your password or cookies.",
+        a: "Never. Downloadit will never ask for your password or cookies.",
       },
       {
         q: "How can I report a problem?",
         a: "Describe the issue and the link you tried, then send it to our support email below.",
       },
-      { q: "How can I contact SnapSave?", a: "Use the Email Support button below." },
+      { q: "How can I contact Downloadit?", a: "Use the Email Support button below." },
     ],
     supportTitle: "Still need help?",
     supportDesc: "Send us an email and we'll help you with your issue.",

@@ -741,7 +741,7 @@ export class PuppeteerProvider extends BaseProvider {
               } catch {
                 host = null;
               }
-              logger.debug("[SnapSave Puppeteer Media Debug] media response", {
+              logger.debug("[Downloadit Puppeteer Media Debug] media response", {
                 host,
                 resourceType,
                 status: statusCode,
@@ -859,7 +859,7 @@ export class PuppeteerProvider extends BaseProvider {
           currentSrcHost: string | null;
           hasPoster: boolean;
         }>;
-        logger.debug("[SnapSave Puppeteer Media Debug] video elements", {
+        logger.debug("[Downloadit Puppeteer Media Debug] video elements", {
           count: videoDetails.length,
           details: videoDetails,
         });
@@ -907,7 +907,7 @@ export class PuppeteerProvider extends BaseProvider {
         addUnique({ url: fetchMeta.ogImage, type: "image", width: null, height: null });
       }
 
-      logger.debug("[SnapSave Puppeteer Media Debug] candidates", {
+      logger.debug("[Downloadit Puppeteer Media Debug] candidates", {
         intercepted: interceptedMedia.length,
         renderedHtml: renderedHtmlMedia.length,
         domVideos: domResult.videos.length,

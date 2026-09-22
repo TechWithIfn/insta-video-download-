@@ -92,7 +92,7 @@ export const ERRORS: Record<ErrorCode, { message: string; status: number; retrya
     retryable: true,
   },
   SERVER_OVERLOADED: {
-    message: "SnapSave is busy right now. Please try again shortly.",
+    message: "Downloadit is busy right now. Please try again shortly.",
     status: 503,
     retryable: true,
   },

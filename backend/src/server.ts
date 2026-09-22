@@ -9,7 +9,7 @@ import { getProvider } from "./lib/providers/index.js";
 const PORT = parseInt(process.env.PORT || "3001", 10);
 
 const server = app.listen(PORT, () => {
-  logger.info(`SnapSave backend running on port ${PORT}`);
+  logger.info(`Downloadit backend running on port ${PORT}`);
 
   const providerName = process.env.RESOLVER_PROVIDER || "placeholder";
   const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:3000";

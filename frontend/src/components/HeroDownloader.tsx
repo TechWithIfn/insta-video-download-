@@ -83,8 +83,8 @@ function formatTime(seconds: number): string {
 }
 
 function sanitizeHandle(username: string | null | undefined): string {
-  if (!username) return "snapsave";
-  return username.replace(/[^a-zA-Z0-9._-]/g, "").replace(/^\.+|\.+$/g, "").slice(0, 60) || "snapsave";
+  if (!username) return "downloadit";
+  return username.replace(/[^a-zA-Z0-9._-]/g, "").replace(/^\.+|\.+$/g, "").slice(0, 60) || "downloadit";
 }
 
 const TABS = [
@@ -102,7 +102,7 @@ type TabId = (typeof TABS)[number]["id"];
 // The value shown here comes exclusively from `progress` SSE events sent
 // by the backend after each resolution stage actually completes. This
 // component never advances itself on a timer.
-const PROGRESS_RING_ID = "snapsave-progress-ring";
+const PROGRESS_RING_ID = "downloadit-progress-ring";
 
 function CircularProgress({ value, label }: { value: number; label: string }) {
   const { t } = useLanguage();
@@ -179,7 +179,7 @@ function VideoPlayer({ src, poster, mediaType }: { src: string; poster?: string;
     const onError = () => {
       if (process.env.NODE_ENV === "development") {
         try {
-          console.debug("[SnapSave Preview]", {
+          console.debug("[Downloadit Preview]", {
             mediaType: mediaType ?? "unknown",
             streamHost: new URL(currentSrc).hostname,
           });
@@ -529,7 +529,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
     (mediaType: string | undefined) => {
       if (process.env.NODE_ENV !== "development") return;
       try {
-        console.debug("[SnapSave Preview]", {
+        console.debug("[Downloadit Preview]", {
           mediaType: mediaType ?? "unknown",
           streamHost: new URL(streamSrc).hostname,
           hasSource: Boolean(result.sourceUrl),

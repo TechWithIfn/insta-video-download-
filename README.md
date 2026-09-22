@@ -1,4 +1,4 @@
-# SnapSave - Instagram Media Downloader
+# Downloadit - Instagram Media Downloader
 
 A production-quality Instagram media downloader web application with a clean frontend/backend separation.
 

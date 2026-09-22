@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import LegalPage from "@/components/LegalPage";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — SnapSave",
-  description: "SnapSave privacy policy.",
+  title: "Privacy Policy — Downloadit",
+  description: "Downloadit privacy policy.",
 };
 
 export default function PrivacyPage() {
   return (
     <LegalPage title="Privacy Policy" updated="September 2026">
       <p>
-        SnapSave does not require an account, sign-up, or login. We do not keep a download
+        Downloadit does not require an account, sign-up, or login. We do not keep a download
         history in your browser.
       </p>
       <p>

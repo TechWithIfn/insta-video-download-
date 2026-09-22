@@ -17,19 +17,19 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
-  title: "SnapSave — Save Instagram Content",
+  title: "Downloadit — Save Instagram Content",
   description:
     "Save public Instagram posts, reels, videos, photos, stories and highlights from a simple link. No login required.",
   openGraph: {
-    title: "SnapSave — Save Instagram Content",
+    title: "Downloadit — Save Instagram Content",
     description:
       "Save public Instagram posts, reels, videos, photos, stories and highlights from a simple link.",
     type: "website",
-    siteName: "SnapSave",
+    siteName: "Downloadit",
   },
   twitter: {
     card: "summary_large_image",
-    title: "SnapSave — Save Instagram Content",
+    title: "Downloadit — Save Instagram Content",
     description:
       "Save public Instagram posts, reels, videos, photos, stories and highlights from a simple link.",
   },
@@ -70,7 +70,7 @@ export default function RootLayout({
                   // Dark Mode ONLY on explicit saved user choice.
                   // No saved preference (or anything else) => Light Mode.
                   // System/OS theme is deliberately ignored.
-                  var t = localStorage.getItem('snapsave-theme');
+                  var t = localStorage.getItem('downloadit-theme');
                   if (t === 'dark') {
                     document.documentElement.setAttribute('data-theme','dark');
                   } else {

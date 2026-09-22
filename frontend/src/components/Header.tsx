@@ -9,7 +9,7 @@ import { useLanguage, LANGUAGES } from "@/i18n";
 function getInitialTheme(): "light" | "dark" {
   if (typeof window === "undefined") return "light";
   try {
-    const stored = localStorage.getItem("snapsave-theme") as "light" | "dark" | null;
+    const stored = localStorage.getItem("downloadit-theme") as "light" | "dark" | null;
     if (stored === "light" || stored === "dark") return stored;
   } catch {}
   // No saved preference: ALWAYS Light Mode. System/OS theme is ignored.
@@ -42,7 +42,7 @@ export default function Header() {
   useEffect(() => {
     if (!mountedRef.current) return;
     document.documentElement.setAttribute("data-theme", theme);
-    try { localStorage.setItem("snapsave-theme", theme); } catch {}
+    try { localStorage.setItem("downloadit-theme", theme); } catch {}
   }, [theme]);
 
   useEffect(() => {
@@ -104,7 +104,7 @@ export default function Header() {
               <Download className="h-5 w-5" strokeWidth={2.2} />
             </span>
             <span className="site-logo-text truncate text-[22px] font-bold tracking-[-0.01em]">
-              Snap<span className="text-primary">Save</span>
+              Download<span className="text-primary">it</span>
             </span>
           </Link>
 

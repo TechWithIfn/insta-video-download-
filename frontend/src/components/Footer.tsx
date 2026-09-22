@@ -75,7 +75,7 @@ export default function Footer() {
                 <Download className="h-[18px] w-[18px]" strokeWidth={2.2} />
               </span>
               <span className="text-[18px] font-bold text-fg">
-                Snap<span className="text-primary">Save</span>
+                Download<span className="text-primary">it</span>
               </span>
             </Link>
             <p className="mt-4 text-[14.5px] font-semibold text-fg">
@@ -106,7 +106,7 @@ export default function Footer() {
         </p>
 
         <div className="mt-4 flex flex-col gap-2 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[13px] text-fg-muted">&copy; {year} SnapSave. {t.footer.rights}</p>
+          <p className="text-[13px] text-fg-muted">&copy; {year} Downloadit. {t.footer.rights}</p>
           <p className="text-[13px] text-fg-subtle">{t.footer.madeWith}</p>
         </div>
       </div>

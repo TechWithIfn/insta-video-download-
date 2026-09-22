@@ -10,7 +10,7 @@ import type { ResolveResponse, ResolveErrorResponse } from "../lib/types.js";
 
 const router = Router();
 
-/** [SnapSave Media Debug] first-item type + hostname only (never query/tokens). */
+/** [Downloadit Media Debug] first-item type + hostname only (never query/tokens). */
 function firstMediaDiag(media: { type: string; url: string }[]): {
   firstMediaType: string | null;
   firstMediaHost: string | null;

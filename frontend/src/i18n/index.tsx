@@ -38,7 +38,7 @@ export const LANGUAGES: LanguageMeta[] = [
   { code: "as", label: "অসমীয়া", short: "AS" },
 ];
 
-const STORAGE_KEY = "snapsave_language";
+const STORAGE_KEY = "downloadit_language";
 const DEFAULT_LANG: LanguageCode = "en";
 
 const catalogs: Record<LanguageCode, Strings> = {

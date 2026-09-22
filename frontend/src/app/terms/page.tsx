@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import LegalPage from "@/components/LegalPage";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — SnapSave",
-  description: "SnapSave terms of service.",
+  title: "Terms of Service — Downloadit",
+  description: "Downloadit terms of service.",
 };
 
 export default function TermsPage() {
   return (
     <LegalPage title="Terms of Service" updated="September 2026">
       <p>
-        SnapSave is a tool for downloading publicly available media that you have the right
+        Downloadit is a tool for downloading publicly available media that you have the right
         to save, for personal use.
       </p>
       <p>

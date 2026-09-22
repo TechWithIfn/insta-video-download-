@@ -23,7 +23,7 @@ function sanitizeDownloadFilename(raw: unknown, contentType: string): string {
     .replace(/^-+|-+$/g, "") // trim edge dashes
     .replace(/^\.+|\.+$/g, "") // trim edge dots
     .replace(/\.[a-z0-9]{2,4}$/, ""); // strip client extension; server decides
-  if (!base) base = "snapsave-media";
+  if (!base) base = "downloadit-media";
   // Enforce the extension from the VERIFIED upstream content type.
   const ct = contentType.toLowerCase();
   let ext = ".mp4";

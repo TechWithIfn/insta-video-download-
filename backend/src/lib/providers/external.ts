@@ -39,7 +39,7 @@ export class ExternalProvider extends BaseProvider {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.apiKey}`,
-          "User-Agent": "SnapSave/1.0",
+          "User-Agent": "Downloadit/1.0",
         },
         body: JSON.stringify({ url }),
       });

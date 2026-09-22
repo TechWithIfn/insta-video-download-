@@ -37,7 +37,7 @@ app.use(express.json({ limit: readPositiveInt("MAX_REQUEST_BODY_SIZE", 1024) }))
 // Lightweight service info. No resolver work here.
 app.get("/", (_req, res) => {
   res.json({
-    service: "SnapSave API",
+    service: "Downloadit API",
     status: "ok",
     timestamp: new Date().toISOString(),
   });

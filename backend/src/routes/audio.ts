@@ -36,12 +36,12 @@ const MAX_CONCURRENT_AUDIO_JOBS = Math.max(
 let activeAudioJobs = 0;
 
 function sanitizeHandle(username: string | null | undefined): string {
-  if (!username) return "snapsave";
+  if (!username) return "downloadit";
   return (
     username
       .replace(/[^a-zA-Z0-9._-]/g, "")
       .replace(/^\.+|\.+$/g, "")
-      .slice(0, 60) || "snapsave"
+      .slice(0, 60) || "downloadit"
   );
 }
 
@@ -65,7 +65,7 @@ setInterval(() => {
       const entries = await readdir(base);
       const now = Date.now();
       for (const entry of entries) {
-        if (!entry.startsWith("snapsave-audio-")) continue;
+        if (!entry.startsWith("downloadit-audio-")) continue;
         const full = join(base, entry);
         try {
           const st = await stat(full);
@@ -86,7 +86,7 @@ setInterval(() => {
 router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
   const requestId = randomBytes(16).toString("hex");
   const startTime = Date.now();
-  const tmpDir = join(tmpdir(), `snapsave-audio-${requestId}`);
+  const tmpDir = join(tmpdir(), `downloadit-audio-${requestId}`);
   const inputPath = join(tmpDir, "input.mp4");
   const outputPath = join(tmpDir, "output.mp3");
   let dirCreated = false;

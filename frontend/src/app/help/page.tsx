@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import HelpClient from "./HelpClient";
 
 export const metadata: Metadata = {
-  title: "Help & Guide | SnapSave",
+  title: "Help & Guide | Downloadit",
   description:
-    "Learn how to use SnapSave, troubleshoot common download issues, and find answers to frequently asked questions.",
+    "Learn how to use Downloadit, troubleshoot common download issues, and find answers to frequently asked questions.",
   openGraph: {
-    title: "Help & Guide | SnapSave",
+    title: "Help & Guide | Downloadit",
     description:
-      "Learn how to use SnapSave, troubleshoot common download issues, and find answers to frequently asked questions.",
+      "Learn how to use Downloadit, troubleshoot common download issues, and find answers to frequently asked questions.",
     type: "website",
-    siteName: "SnapSave",
+    siteName: "Downloadit",
   },
 };
 

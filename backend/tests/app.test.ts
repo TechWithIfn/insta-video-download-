@@ -25,7 +25,7 @@ describe("App wiring (shared by local server and Vercel function)", () => {
     const res = await fetch(`${base}/`);
     expect(res.status).toBe(200);
     const body = (await res.json()) as { service?: string; status?: string };
-    expect(body.service).toBe("SnapSave API");
+    expect(body.service).toBe("Downloadit API");
     expect(body.status).toBe("ok");
   });
 
