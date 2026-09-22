@@ -554,159 +554,206 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
     }
   }, [firstMedia, streamSrc, logPreviewDiag]);
 
+  // Derived metadata for the new two-column card
+  const resolution = firstMedia?.width && firstMedia?.height ? `${firstMedia.width} × ${firstMedia.height}` : firstMedia?.type === "video" ? "1080 × 1920" : "—";
+  const durationLabel = firstMedia?.duration ? formatTime(firstMedia.duration) : "—";
+  const previewRef = useRef<HTMLDivElement>(null);
+  const handlePreview = useCallback(() => {
+    const v = previewRef.current?.querySelector<HTMLVideoElement>("video");
+    if (v) {
+      if (v.paused) v.play().catch(() => {});
+      else v.pause();
+      v.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    const a = previewRef.current?.querySelector<HTMLAudioElement>("audio");
+    if (a) {
+      if (a.paused) a.play().catch(() => {});
+      else a.pause();
+    }
+    previewRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
+
+  const metaLabel = isAudio ? t.result.metaAudio : firstMedia?.type === "image" ? t.typeBadges.photo : t.result.metaVideo;
+  const formatLabel = isAudio ? "MP3" : firstMedia?.type === "image" ? "JPG" : "MP4";
+  const qualityLabel = "HD";
+
   return (
-    <div className="animate-fade-in-up mx-auto mt-6 w-full sm:mt-10 sm:px-5" style={{ maxWidth: "440px" }}>
+    <div className="animate-fade-in-up mx-auto mt-6 w-[calc(100%-32px)] max-w-[720px] sm:mt-10 sm:w-full sm:max-w-[760px] sm:px-5">
       <div
-        className="result-card overflow-hidden rounded-[28px] p-3 sm:p-4"
+        className="overflow-hidden rounded-[28px] p-3 sm:p-4 md:p-5"
         style={{ background: "var(--card)", boxShadow: "0 20px 60px rgba(60,40,120,0.12)", border: "1px solid var(--border)" }}
       >
-        {/* Top Row */}
-        <div className="result-top-row flex items-center justify-between gap-2 px-1 pb-3">
+        {/* Card header: badge + handle + New */}
+        <div className="mb-3 flex items-center justify-between gap-2 px-1">
           <span
-            className="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-bold text-white sm:px-3 sm:text-xs"
+            className="inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-bold text-white"
             style={{ background: isAudio ? "linear-gradient(135deg, #7c4df5, #ec5fa8)" : "var(--brand-gradient)" }}
           >
             {isAudio ? t.result.audio : getContentTypeLabel(result.type, t.typeBadges)}
           </span>
           {result.author && (
-            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+            <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5 sm:justify-start">
               <div className="h-[22px] w-[22px] shrink-0 rounded-full" style={{ background: "var(--brand-gradient)" }} />
-              <span className="result-username text-[13px] font-semibold text-fg sm:text-[14px]">
-                @{result.author.username}
-              </span>
+              <span className="truncate text-[13px] font-semibold text-fg sm:text-[14px]">@{result.author.username}</span>
             </div>
           )}
           <button
             type="button"
             onClick={onReset}
-            className="flex min-h-[44px] shrink-0 items-center px-1 text-[13px] font-semibold text-fg-subtle transition-colors hover:text-fg"
+            className="flex min-h-[44px] shrink-0 items-center gap-1 px-1 text-[13px] font-semibold text-fg-subtle transition-colors hover:text-fg"
           >
-            <X className="mr-0.5 inline h-3.5 w-3.5" />
+            <X className="h-3.5 w-3.5" />
             {t.result.newBtn}
           </button>
         </div>
 
-        {/* Caption (one block, max 2 lines) */}
         {result.title && (
-          <div className="px-1 pb-3">
-            <p className="text-[13px] leading-[1.5] text-fg-muted line-clamp-2 break-words">
-              {decodeHtmlEntities(result.title)}
-            </p>
-          </div>
-        )}
-
-        {/* Media Player */}
-        {isAudio ? (
-          <>
-            {audioLoading && (
-              <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-3 rounded-[20px]" style={{ background: "linear-gradient(145deg, #1a1028 0%, #0f0c1b 100%)" }}>
-                <svg className="h-8 w-8 animate-spin text-white/40" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
-                  <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" className="opacity-75" />
-                </svg>
-                <p className="text-xs text-white/50">{t.result.extractingAudio}</p>
-              </div>
-            )}
-            {audioError && (
-              <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-danger-light">
-                <AlertCircle className="h-8 w-8 text-danger" />
-                <p className="text-xs text-danger text-center px-4 break-words">{audioError}</p>
-              </div>
-            )}
-            {audioUrl && <AudioPlayer src={audioUrl} />}
-          </>
-        ) : !firstMedia ? null : firstMedia.type === "video" ? (
-          <div className="result-video-wrap">
-            <VideoPlayer
-              key={firstMedia.url}
-              src={streamSrc}
-              poster={firstMedia.thumbnail || undefined}
-              mediaType={firstMedia.type}
-            />
-          </div>
-        ) : imgFailed ? (
-          <div className="result-video-wrap">
-            <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-black/5">
-              <ImageIcon className="h-10 w-10" style={{ color: "var(--fg-subtle)", opacity: 0.4 }} />
-              <p className="text-xs" style={{ color: "var(--fg-subtle)" }}>{t.result.previewUnavailable}</p>
-            </div>
-          </div>
-        ) : (
-          <div className="result-video-wrap">
-            {/* eslint-disable-next-line @next/next/no-img-element -- next/image cannot serve our dynamic backend /api/stream proxy URLs; plain img streams from our own backend exactly like <video> does */}
-            <img
-              key={firstMedia.url}
-              src={imgSrc ?? streamSrc}
-              alt={result.title ? decodeHtmlEntities(result.title).slice(0, 120) : t.typeBadges.photo}
-              className="media-frame w-full rounded-[20px] object-contain"
-              style={{ background: "#0a0a14" }}
-              onError={handleImgError}
-            />
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="mt-3 flex flex-col gap-2.5 px-1 sm:flex-row sm:items-center sm:justify-between">
-          <span
-            className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg px-2.5 py-1.5 text-xs font-medium text-fg-muted"
-            style={{ background: "var(--bg)" }}
-          >
-            {isAudio ? (
-              <>
-                <Music className="h-3.5 w-3.5 text-primary" />
-                {t.result.metaAudio}
-              </>
-            ) : firstMedia?.type === "image" ? (
-              <>
-                <ImageIcon className="h-3.5 w-3.5 text-primary" />
-                {t.typeBadges.photo}
-              </>
-            ) : (
-              <>
-                <Film className="h-3.5 w-3.5 text-primary" />
-                {t.result.metaVideo}
-              </>
-            )}
-          </span>
-
-          <button
-            type="button"
-            onClick={isAudio ? handleDownloadAudio : handleDownloadVideo}
-            disabled={(isAudio && !audioUrl) || downloading === "preparing" || (isAudio && audioLoading)}
-            aria-label={isAudio ? t.result.downloadAudioLabel : t.result.downloadVideoLabel}
-            className="gradient-btn result-download h-12 min-h-[48px] w-full flex-1 text-[14px] sm:h-11 sm:min-h-[44px] sm:w-auto"
-          >
-            {downloading === "preparing" ? (
-              <>
-                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
-                  <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" className="opacity-75" />
-                </svg>
-                {t.result.downloading}
-              </>
-            ) : downloading === "error" ? (
-              <>
-                <DownloadIcon className="h-4 w-4" />
-                {t.result.tryAgain}
-              </>
-            ) : (
-              <>
-                <DownloadIcon className="h-4 w-4" />
-                {isAudio ? t.result.downloadAudio : t.result.download}
-              </>
-            )}
-          </button>
-        </div>
-        {downloading === "error" && !isAudio && (
-          <p className="mt-2 px-1 text-center text-[12.5px] font-medium text-danger" role="alert">
-            {t.result.downloadFailed}
+          <p className="px-1 pb-3 text-[13px] leading-[1.5] text-fg-muted line-clamp-2 break-words">
+            {decodeHtmlEntities(result.title)}
           </p>
         )}
+
+        {/* ── Two-column body: LEFT preview / RIGHT info ── */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
+          {/* LEFT: large preview */}
+          <div ref={previewRef} className="min-w-0">
+            {isAudio ? (
+              <>
+                {audioLoading && (
+                  <div
+                    className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-3 rounded-[20px] md:aspect-[4/3]"
+                    style={{ background: "linear-gradient(145deg, #1a1028 0%, #0f0c1b 100%)" }}
+                  >
+                    <svg className="h-8 w-8 animate-spin text-white/40" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                      <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" className="opacity-75" />
+                    </svg>
+                    <p className="text-xs text-white/50">{t.result.extractingAudio}</p>
+                  </div>
+                )}
+                {audioError && (
+                  <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-danger-light">
+                    <AlertCircle className="h-8 w-8 text-danger" />
+                    <p className="break-words px-4 text-center text-xs text-danger">{audioError}</p>
+                  </div>
+                )}
+                {audioUrl && <AudioPlayer src={audioUrl} />}
+              </>
+            ) : !firstMedia ? null : firstMedia.type === "video" ? (
+              <VideoPlayer
+                key={firstMedia.url}
+                src={streamSrc}
+                poster={firstMedia.thumbnail || undefined}
+                mediaType={firstMedia.type}
+              />
+            ) : imgFailed ? (
+              <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-black/5">
+                <ImageIcon className="h-10 w-10" style={{ color: "var(--fg-subtle)", opacity: 0.4 }} />
+                <p className="text-xs" style={{ color: "var(--fg-subtle)" }}>
+                  {t.result.previewUnavailable}
+                </p>
+              </div>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element -- next/image cannot serve our dynamic backend /api/stream proxy URLs; plain img streams from our own backend exactly like <video> does
+              <img
+                key={firstMedia.url}
+                src={imgSrc ?? streamSrc}
+                alt={result.title ? decodeHtmlEntities(result.title).slice(0, 120) : t.typeBadges.photo}
+                className="media-frame w-full rounded-[20px] object-contain"
+                style={{ background: "#0a0a14", aspectRatio: "4/3" } as React.CSSProperties}
+                onError={handleImgError}
+              />
+            )}
+          </div>
+
+          {/* RIGHT: information + actions */}
+          <div className="flex min-w-0 flex-col gap-3 md:gap-4">
+            <div className="rounded-[18px] p-4" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-white"
+                  style={{ background: "var(--brand-gradient)" }}
+                >
+                  {isAudio ? <Music className="h-4 w-4" /> : <Film className="h-4 w-4" />}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[14px] font-bold leading-none text-fg">{isAudio ? t.result.audio : "Video"}</p>
+                  <p className="mt-1 text-[12px] font-semibold tracking-wide text-fg-subtle">
+                    {formatLabel} • {qualityLabel}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <div className="rounded-xl bg-card px-2.5 py-2.5 text-center sm:px-3" style={{ border: "1px solid var(--border)" }}>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-fg-subtle">Resolution</p>
+                  <p className="mt-1 truncate text-[13px] font-bold text-fg">{resolution}</p>
+                </div>
+                <div className="rounded-xl bg-card px-2.5 py-2.5 text-center sm:px-3" style={{ border: "1px solid var(--border)" }}>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-fg-subtle">Size</p>
+                  <p className="mt-1 text-[13px] font-bold text-fg">Original</p>
+                </div>
+                <div className="rounded-xl bg-card px-2.5 py-2.5 text-center sm:px-3" style={{ border: "1px solid var(--border)" }}>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-fg-subtle">Duration</p>
+                  <p className="mt-1 text-[13px] font-bold text-fg">{durationLabel}</p>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-card px-2.5 py-2 text-xs font-medium text-fg-muted" style={{ border: "1px solid var(--border)" }}>
+                {isAudio ? <Music className="h-3.5 w-3.5 shrink-0 text-primary" /> : <Film className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                <span className="truncate">{metaLabel}</span>
+              </div>
+            </div>
+
+            <div className="mt-auto flex flex-col gap-2.5 sm:flex-row">
+              <button
+                type="button"
+                onClick={handlePreview}
+                className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-[14px] border border-border bg-card px-4 text-[14px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary"
+              >
+                <Play className="h-4 w-4" />
+                Preview
+              </button>
+
+              <button
+                type="button"
+                onClick={isAudio ? handleDownloadAudio : handleDownloadVideo}
+                disabled={(isAudio && !audioUrl) || downloading === "preparing" || (isAudio && audioLoading)}
+                aria-label={isAudio ? t.result.downloadAudioLabel : t.result.downloadVideoLabel}
+                className="gradient-btn min-h-[48px] flex-1 text-[14px] disabled:opacity-60"
+              >
+                {downloading === "preparing" ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                      <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" className="opacity-75" />
+                    </svg>
+                    {t.result.downloading}
+                  </>
+                ) : downloading === "error" ? (
+                  <>
+                    <DownloadIcon className="h-4 w-4" />
+                    {t.result.tryAgain}
+                  </>
+                ) : (
+                  <>
+                    <DownloadIcon className="h-4 w-4" />
+                    {isAudio ? t.result.downloadAudio : t.result.download}
+                  </>
+                )}
+              </button>
+            </div>
+            {downloading === "error" && !isAudio && (
+              <p className="text-center text-[12.5px] font-medium text-danger" role="alert">
+                {t.result.downloadFailed}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
-      <p className="mt-4 break-words px-2 text-center text-[12px] text-fg-subtle sm:text-[12.5px]">
-        {t.result.tempNote}
-      </p>
+      <p className="mt-4 break-words px-2 text-center text-[12px] text-fg-subtle sm:text-[12.5px]">{t.result.tempNote}</p>
     </div>
   );
 }
