@@ -28,6 +28,12 @@ const UPSTREAM_TIMEOUT_MS = 60_000;
 const FFMPEG_TIMEOUT_MS = 60_000;
 const STALE_DIR_TTL_MS = 30 * 60 * 1000;
 const SWEEP_INTERVAL_MS = 10 * 60 * 1000;
+// FFmpeg is CPU-intensive: bound concurrent conversions, fail fast when full.
+const MAX_CONCURRENT_AUDIO_JOBS = Math.max(
+  1,
+  parseInt(process.env.MAX_CONCURRENT_AUDIO_JOBS || "2", 10) || 2
+);
+let activeAudioJobs = 0;
 
 function sanitizeHandle(username: string | null | undefined): string {
   if (!username) return "snapsave";
@@ -97,9 +103,20 @@ router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
     });
     if (!ffmpegOk) {
       logger.error("[AUDIO] ffmpeg unavailable", { requestId });
-      res.status(503).json(createErrorResponse("PROVIDER_UNAVAILABLE"));
+      // Truthful code: the resolver is healthy — audio conversion itself is down.
+      const unavailable = createError("AUDIO_UNAVAILABLE");
+      res.status(unavailable.statusCode).json(unavailable.toResponse());
       return;
     }
+
+    // Bounded concurrency: fail fast instead of stacking unlimited FFmpeg jobs.
+    if (activeAudioJobs >= MAX_CONCURRENT_AUDIO_JOBS) {
+      logger.warn("[AUDIO] overloaded", { requestId, active: activeAudioJobs });
+      const overloaded = createError("SERVER_OVERLOADED");
+      res.status(overloaded.statusCode).json(overloaded.toResponse());
+      return;
+    }
+    activeAudioJobs++;
 
     // --- 2. Validate body ---
     const contentLength = req.headers["content-length"];
@@ -327,6 +344,7 @@ router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
       res.status(500).json(createErrorResponse("TEMPORARY_ERROR"));
     }
   } finally {
+    activeAudioJobs = Math.max(0, activeAudioJobs - 1);
     if (dirCreated) {
       await cleanupDir(tmpDir, requestId).catch(() => {});
     }
