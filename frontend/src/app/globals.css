@@ -555,6 +555,13 @@ svg {
     min-height: 48px;
     white-space: nowrap;
   }
+  /* Plain `.gradient-btn` CSS beats Tailwind utilities in the cascade,
+     so its desktop 32px side padding must be overridden explicitly. */
+  .url-actions .gradient-btn {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    gap: 6px;
+  }
   .url-actions .btn-label {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -598,11 +605,30 @@ svg {
   }
 }
 
-/* Ultra-narrow: 320px–359px — tighten even further */
+/* Ultra-narrow: 320px–359px — tighten even further.
+   Width budget at 320px (~301px usable): logo ~118 + controls ~156 + gaps. */
 @media (max-width: 359.98px) {
   .site-header-inner {
     padding-left: max(0.6rem, var(--sal)) !important;
     padding-right: max(0.6rem, var(--sar)) !important;
+    gap: 0.25rem !important;
+  }
+  .site-controls {
+    gap: 0 !important;
+  }
+  .site-icon-btn {
+    min-width: 36px !important;
+    height: 36px !important;
+  }
+  .site-menu-btn {
+    height: 36px !important;
+    width: 36px !important;
+  }
+  .theme-toggle {
+    width: 48px !important;
+  }
+  [data-theme="dark"] .theme-toggle__thumb {
+    left: 21px !important;
   }
   .site-logo-text {
     font-size: 1rem !important;

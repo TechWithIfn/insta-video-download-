@@ -884,12 +884,27 @@ export default function HeroDownloader() {
   const isAudioMode = activeTab === "audio";
 
   const tabsRef = useRef<HTMLDivElement>(null);
+  const resultAnchorRef = useRef<HTMLDivElement>(null);
+  const prevStateRef = useRef<UIState>("IDLE");
 
   // Keep the active tab fully visible inside the horizontal scroller.
   useEffect(() => {
     const el = tabsRef.current?.querySelector<HTMLElement>("[data-active='true']");
     el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
   }, [activeTab]);
+
+  // On phones, bring the fresh result into view so Preview / Download are
+  // reachable without hunting. Desktop behavior is left untouched.
+  useEffect(() => {
+    if (state === "SUCCESS" && prevStateRef.current !== "SUCCESS") {
+      if (typeof window !== "undefined" && window.innerWidth < 640) {
+        requestAnimationFrame(() => {
+          resultAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
+    }
+    prevStateRef.current = state;
+  }, [state]);
 
   return (
     <section
@@ -1130,7 +1145,7 @@ export default function HeroDownloader() {
         </div>
 
         {/* Result / Error Area */}
-        <div aria-live="polite" aria-atomic="true">
+        <div ref={resultAnchorRef} aria-live="polite" aria-atomic="true" className="scroll-mt-20">
           {state === "PREPARING" && (
             <CircularProgress value={progress} label={progressStage || t.hero.analyzing} />
           )}

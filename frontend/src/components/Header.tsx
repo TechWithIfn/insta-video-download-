@@ -108,7 +108,7 @@ export default function Header() {
             </span>
           </Link>
 
-          <div className="flex min-w-0 shrink-0 items-center gap-0.5 sm:gap-6">
+          <div className="site-controls flex min-w-0 shrink-0 items-center gap-0.5 sm:gap-6">
             <div className="relative" ref={langRef}>
               <button
                 type="button"
@@ -201,7 +201,7 @@ export default function Header() {
 
             <button
               type="button"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-fg-muted transition-colors hover:bg-primary-light hover:text-primary lg:hidden"
+              className="site-menu-btn flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-fg-muted transition-colors hover:bg-primary-light hover:text-primary lg:hidden"
               onClick={() => setMobileOpen(true)}
               aria-label={t.header.openMenu}
               aria-expanded={mobileOpen}
