@@ -6,7 +6,7 @@ import { checkRateLimit } from "../lib/rate-limit.js";
 import {
   validateProxyUrl,
   getClientIp,
-  fetchUpstreamMedia,
+  fetchUpstreamMediaResilient,
   isHtmlContent,
   pipeUpstreamToClient,
 } from "../lib/media-proxy.js";
@@ -62,14 +62,19 @@ router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
 
     logger.info("[DOWNLOAD] validated URL", { requestId, hostname: validation.value.hostname });
 
-    // Use the already-resolved media URL directly — never re-resolve here.
-    // If the CDN reports it expired, the client re-runs Get Media (fast path).
+    // Use the already-resolved media URL directly. On expired/invalid CDN
+    // URLs the helper re-resolves once from `source` (when supplied) and
+    // retries against the fresh URL — never a blind Puppeteer relaunch.
     const upstreamStart = Date.now();
-    const upstream = await fetchUpstreamMedia(validation.value.url, {
+    const { status: upstream, refreshed } = await fetchUpstreamMediaResilient(validation.value.url, {
       timeoutMs: UPSTREAM_TIMEOUT_MS,
       tag: "DOWNLOAD",
       requestId,
+      sourceUrl: req.query.source,
     });
+    if (refreshed) {
+      logger.info("[DOWNLOAD] serving from refreshed media URL", { requestId });
+    }
 
     if (upstream.kind === "timeout") {
       res.status(504).json(createErrorResponse("PROVIDER_TIMEOUT"));

@@ -1,6 +1,6 @@
 import type { InstagramResolver, ResolverResult, ResolveProgressCallback } from "../types.js";
 import { createProvider } from "../providers/index.js";
-import { getCachedResult, setCachedResult } from "../provider-cache.js";
+import { getCachedResult, setCachedResult, deleteCachedResult } from "../provider-cache.js";
 import { hashUrl } from "../crypto.js";
 import { logger } from "../logger.js";
 
@@ -23,12 +23,29 @@ export function resetResolver(): void {
   lastProviderName = null;
 }
 
-export async function resolveUrl(url: string, onProgress?: ResolveProgressCallback): Promise<ResolverResult> {
-  const cached = getCachedResult(url);
-  if (cached) {
-    logger.info("Cache hit", { url: url.slice(0, 80) });
-    onProgress?.(90, "Cached result found");
-    return cached;
+export interface ResolveOptions {
+  /**
+   * Skip the resolve cache read (used for expiry recovery: the cached CDN
+   * URL is known-bad, so fresh provider data is required). The fresh result
+   * is still stored, keeping the cache warm for subsequent requests.
+   */
+  bypassCache?: boolean;
+}
+
+export async function resolveUrl(
+  url: string,
+  onProgress?: ResolveProgressCallback,
+  opts?: ResolveOptions
+): Promise<ResolverResult> {
+  if (!opts?.bypassCache) {
+    const cached = getCachedResult(url);
+    if (cached) {
+      logger.info("Cache hit", { url: url.slice(0, 80) });
+      onProgress?.(90, "Cached result found");
+      return cached;
+    }
+  } else {
+    deleteCachedResult(url);
   }
 
   const key = hashUrl(url);

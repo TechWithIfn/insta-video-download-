@@ -35,6 +35,11 @@ export function setCachedResult(url: string, result: ResolverResult): void {
   });
 }
 
+/** Drop a cached entry so the next resolve fetches fresh data (expiry recovery). */
+export function deleteCachedResult(url: string): void {
+  store.delete(hashUrl(url));
+}
+
 function evictOldest(): void {
   let oldestKey: string | null = null;
   let oldestTime = Infinity;

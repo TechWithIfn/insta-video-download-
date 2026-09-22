@@ -156,7 +156,7 @@ function CircularProgress({ value, label }: { value: number; label: string }) {
 
 // ─── Video Player ─────────────────────────────────────────
 
-function VideoPlayer({ src, poster }: { src: string; poster?: string }) {
+function VideoPlayer({ src, poster, mediaType }: { src: string; poster?: string; mediaType?: string }) {
   const { t } = useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
@@ -176,6 +176,16 @@ function VideoPlayer({ src, poster }: { src: string; poster?: string }) {
     const onMeta = () => setDuration(v.duration);
     const onEnd = () => { setPlaying(false); setCurrent(0); };
     const onError = () => {
+      if (process.env.NODE_ENV === "development") {
+        try {
+          console.debug("[SnapSave Preview]", {
+            mediaType: mediaType ?? "unknown",
+            streamHost: new URL(currentSrc).hostname,
+          });
+        } catch {
+          /* ignore logging failures */
+        }
+      }
       if (retryCountRef.current < 1) {
         retryCountRef.current++;
         const bust = currentSrc.includes("?") ? "&" : "?";
@@ -198,7 +208,7 @@ function VideoPlayer({ src, poster }: { src: string; poster?: string }) {
       v.removeEventListener("ended", onEnd);
       v.removeEventListener("error", onError);
     };
-  }, [currentSrc]);
+  }, [currentSrc, mediaType]);
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
@@ -427,6 +437,11 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioLoading, setAudioLoading] = useState(true);
   const [audioError, setAudioError] = useState<string | null>(null);
+  // Image-preview retry state (video uses VideoPlayer's own retry).
+  // MediaResult remounts per result (parent key), so these reset naturally.
+  const [imgSrc, setImgSrc] = useState<string | null>(null);
+  const [imgFailed, setImgFailed] = useState(false);
+  const imgRetriedRef = useRef(false);
   // Stable fallback message for the audio fetch below: reading it from a ref
   // keeps the fetch effect from re-running on language switches.
   const audioFallbackRef = useRef(t.result.audioErrorFallback);
@@ -475,7 +490,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
     setDownloading("preparing");
     try {
       const safeHandle = sanitizeHandle(result.author?.username);
-      const filename = `${safeHandle}-video.mp4`;
+      const filename = `${safeHandle}-${firstMedia.type === "video" ? "video" : "photo"}.mp4`;
       const downloadUrl = getDownloadUrl(firstMedia.url, filename, result.sourceUrl);
       const a = document.createElement("a");
       a.href = downloadUrl;
@@ -504,8 +519,37 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
     document.body.removeChild(a);
   }, [audioUrl, result.author?.username]);
 
-  // Video stream URL through our proxy (source allows stale-URL recovery)
+  // Media stream URL through our proxy (source allows stale-URL recovery)
   const streamSrc = firstMedia ? getStreamUrl(firstMedia.url, result.sourceUrl) : "";
+
+  const logPreviewDiag = useCallback(
+    (mediaType: string | undefined) => {
+      if (process.env.NODE_ENV !== "development") return;
+      try {
+        console.debug("[SnapSave Preview]", {
+          mediaType: mediaType ?? "unknown",
+          streamHost: new URL(streamSrc).hostname,
+          hasSource: Boolean(result.sourceUrl),
+        });
+      } catch {
+        /* ignore logging failures */
+      }
+    },
+    [streamSrc, result.sourceUrl]
+  );
+
+  // Image preview: retry once with a cache-buster, then show the error state.
+  // (The backend already retried with a freshly resolved URL when possible.)
+  const handleImgError = useCallback(() => {
+    logPreviewDiag(firstMedia?.type);
+    if (!imgRetriedRef.current) {
+      imgRetriedRef.current = true;
+      const bust = streamSrc.includes("?") ? "&" : "?";
+      setImgSrc(`${streamSrc}${bust}_retry=${Date.now()}`);
+    } else {
+      setImgFailed(true);
+    }
+  }, [firstMedia, streamSrc, logPreviewDiag]);
 
   return (
     <div className="animate-fade-in-up mx-auto mt-10 px-4 sm:px-5" style={{ width: "min(100%, 440px)", maxWidth: "calc(100vw - 24px)" }}>
@@ -568,14 +612,28 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
             )}
             {audioUrl && <AudioPlayer src={audioUrl} />}
           </>
+        ) : !firstMedia ? null : firstMedia.type === "video" ? (
+          <VideoPlayer
+            key={firstMedia.url}
+            src={streamSrc}
+            poster={firstMedia.thumbnail || undefined}
+            mediaType={firstMedia.type}
+          />
+        ) : imgFailed ? (
+          <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-black/5">
+            <ImageIcon className="h-10 w-10" style={{ color: "var(--fg-subtle)", opacity: 0.4 }} />
+            <p className="text-xs" style={{ color: "var(--fg-subtle)" }}>{t.result.previewUnavailable}</p>
+          </div>
         ) : (
-          firstMedia && (
-            <VideoPlayer
-              key={firstMedia.url}
-              src={streamSrc}
-              poster={firstMedia.thumbnail || undefined}
-            />
-          )
+          // eslint-disable-next-line @next/next/no-img-element -- next/image cannot serve our dynamic backend /api/stream proxy URLs; plain img streams from our own backend exactly like <video> does
+          <img
+            key={firstMedia.url}
+            src={imgSrc ?? streamSrc}
+            alt={result.title ? decodeHtmlEntities(result.title).slice(0, 120) : t.typeBadges.photo}
+            className="media-frame w-full rounded-[20px] object-contain"
+            style={{ background: "#0a0a14" }}
+            onError={handleImgError}
+          />
         )}
 
         {/* Footer */}
@@ -588,6 +646,11 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
               <>
                 <Music className="h-3.5 w-3.5 text-primary" />
                 {t.result.metaAudio}
+              </>
+            ) : firstMedia?.type === "image" ? (
+              <>
+                <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                {t.typeBadges.photo}
               </>
             ) : (
               <>

@@ -6,7 +6,7 @@ import { checkRateLimit } from "../lib/rate-limit.js";
 import {
   validateProxyUrl,
   getClientIp,
-  fetchUpstreamMedia,
+  fetchUpstreamMediaResilient,
   isHtmlContent,
   pipeUpstreamToClient,
 } from "../lib/media-proxy.js";
@@ -250,12 +250,18 @@ router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
     const clientRange = parseRangeHeader(req.headers.range);
 
     const upstreamStart = Date.now();
-    const upstream = await fetchUpstreamMedia(validation.value.url, {
+    // Resilient fetch: on expired/invalid CDN URLs the helper re-resolves
+    // once from `source` (when supplied) and retries against the fresh URL.
+    const { status: upstream, refreshed } = await fetchUpstreamMediaResilient(validation.value.url, {
       timeoutMs: UPSTREAM_TIMEOUT_MS,
       rangeHeader: req.headers.range,
       tag: "STREAM",
       requestId,
+      sourceUrl: req.query.source,
     });
+    if (refreshed) {
+      logger.info("[STREAM] serving from refreshed media URL", { requestId });
+    }
 
     if (upstream.kind === "timeout") {
       res.status(504).json(createErrorResponse("PROVIDER_TIMEOUT"));

@@ -1,5 +1,7 @@
 import type { Request, Response as ExpressResponse } from "express";
 import { isPrivateOrReservedHost, isCdnMediaHost } from "./providers/base.js";
+import { resolveUrl } from "./resolvers/index.js";
+import { validateInstagramUrl } from "./validators/instagram-url.js";
 import { logger } from "./logger.js";
 
 function isInstagramHost(hostname: string): boolean {
@@ -172,6 +174,86 @@ export async function fetchUpstreamMedia(
 export function isHtmlContent(contentType: string): boolean {
   const ct = contentType.toLowerCase();
   return ct.includes("text/html") || ct.includes("application/xhtml");
+}
+
+// Upstream statuses that indicate the signed CDN URL is expired or invalid
+// (as opposed to a transport problem). Only these trigger a single guarded
+// re-resolution. 429 is deliberately excluded: re-resolving while rate
+// limited would amplify load instead of recovering.
+const REFRESHABLE_STATUSES = new Set([401, 403, 404, 410, 500, 502, 503, 504]);
+
+export interface ResilientUpstreamResult {
+  status: UpstreamStatus;
+  refreshed: boolean;
+}
+
+/**
+ * Fetch upstream media, with ONE guarded recovery attempt: if the CDN
+ * reports the URL expired/invalid AND the caller supplied the original
+ * Instagram `sourceUrl`, re-run the resolver (bypassing the stale cache
+ * entry) and retry exactly once against the fresh media URL.
+ *
+ * Security is preserved end-to-end: the source must be a valid Instagram
+ * URL and the refreshed URL must pass the same CDN/SSRF validation.
+ * Maximum 2 upstream attempts per call — never an open retry loop.
+ */
+export async function fetchUpstreamMediaResilient(
+  initialUrl: string,
+  options: {
+    timeoutMs: number;
+    rangeHeader?: string;
+    tag: string;
+    requestId: string;
+    sourceUrl?: unknown;
+  }
+): Promise<ResilientUpstreamResult> {
+  const { sourceUrl, ...fetchOpts } = options;
+  const first = await fetchUpstreamMedia(initialUrl, { ...fetchOpts });
+
+  if (first.kind !== "ok" || !REFRESHABLE_STATUSES.has(first.response.status)) {
+    return { status: first, refreshed: false };
+  }
+
+  if (typeof sourceUrl !== "string" || sourceUrl.length === 0) {
+    await first.response.body?.cancel().catch(() => {});
+    return { status: first, refreshed: false };
+  }
+
+  const validation = validateInstagramUrl(sourceUrl);
+  if (!validation.valid || !validation.parsed) {
+    await first.response.body?.cancel().catch(() => {});
+    return { status: first, refreshed: false };
+  }
+
+  logger.info(`[${options.tag}] upstream reports expired media, re-resolving once`, {
+    requestId: options.requestId,
+    status: first.response.status,
+  });
+
+  let freshUrl: string | null = null;
+  try {
+    const result = await resolveUrl(validation.parsed.normalized, undefined, { bypassCache: true });
+    const candidate = result.media[0]?.url;
+    if (typeof candidate === "string" && candidate.length > 0) {
+      const mediaValidation = validateProxyUrl(candidate);
+      if (mediaValidation.ok && mediaValidation.value.url !== initialUrl) {
+        freshUrl = mediaValidation.value.url;
+      }
+    }
+  } catch (err) {
+    logger.warn(`[${options.tag}] refresh re-resolve failed`, {
+      requestId: options.requestId,
+      error: err instanceof Error ? err.message : "unknown",
+    });
+  }
+
+  await first.response.body?.cancel().catch(() => {});
+  if (!freshUrl) {
+    return { status: first, refreshed: false };
+  }
+
+  const retry = await fetchUpstreamMedia(freshUrl, { ...fetchOpts });
+  return { status: retry, refreshed: true };
 }
 
 export async function pipeUpstreamToClient(
