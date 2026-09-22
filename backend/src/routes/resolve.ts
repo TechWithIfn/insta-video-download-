@@ -137,4 +137,146 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+/**
+ * GET /api/resolve/stream?url=<instagram-url>
+ *
+ * Server-Sent Events endpoint that reports REAL resolution stages as they
+ * complete, then delivers the normalized media result. No timers, no fake
+ * percentages: every `progress` event is emitted only after the
+ * corresponding backend stage has actually finished.
+ *
+ * Events:
+ *   progress  { progress: 0-99, stage: string }
+ *   complete  { progress: 100, stage: "Media ready!", data: ResolvedMedia }
+ *   error     { code, message, retryable }
+ */
+router.get("/stream", async (req: Request, res: Response): Promise<void> => {
+  const requestId = generateToken();
+  const startTime = Date.now();
+  let settled = false;
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.setHeader("X-Request-Id", requestId);
+  res.flushHeaders();
+
+  const send = (event: string, data: unknown): void => {
+    if (settled || res.writableEnded) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  const finish = (): void => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    try {
+      res.end();
+    } catch {
+      /* client already gone */
+    }
+  };
+
+  const sendError = (error: unknown): void => {
+    if (error instanceof AppError) {
+      logger.warn("Resolve stream error", {
+        requestId,
+        code: error.code,
+        duration: Date.now() - startTime,
+      });
+      send("error", error.toResponse().error);
+    } else {
+      logger.error("Resolve stream unexpected error", {
+        requestId,
+        duration: Date.now() - startTime,
+        error: error instanceof Error ? error.message : "unknown",
+      });
+      send("error", createErrorResponse("TEMPORARY_ERROR").error);
+    }
+    finish();
+  };
+
+  const timeoutMs = parseInt(process.env.RESOLVER_TIMEOUT_MS || "15000", 10);
+  const timer = setTimeout(() => {
+    if (settled) return;
+    logger.warn("Resolve stream timeout", { requestId, timeoutMs });
+    send("error", createErrorResponse("RESOLVER_TIMEOUT").error);
+    finish();
+  }, timeoutMs);
+
+  req.on("close", () => {
+    if (!settled) {
+      settled = true;
+      clearTimeout(timer);
+      logger.info("Resolve stream client disconnected", { requestId });
+    }
+  });
+
+  try {
+    const rawUrl = req.query.url;
+    send("progress", { progress: 5, stage: "Request received" });
+
+    if (typeof rawUrl !== "string" || rawUrl.length === 0) {
+      send("error", createErrorResponse("VALIDATION_ERROR").error);
+      finish();
+      return;
+    }
+
+    const ip =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+      (req.headers["x-real-ip"] as string) ||
+      req.ip ||
+      "anonymous";
+
+    const rateLimitResult = checkRateLimit(`resolve:${ip}`);
+    if (!rateLimitResult.allowed) {
+      logger.warn("Rate limit exceeded", { requestId, ip });
+      send("error", createErrorResponse("RATE_LIMITED").error);
+      finish();
+      return;
+    }
+
+    const validation = validateInstagramUrl(rawUrl);
+    if (!validation.valid || !validation.parsed) {
+      logger.info("URL validation failed", {
+        requestId,
+        error: validation.error,
+      });
+      send("error", createErrorResponse("INVALID_URL").error);
+      finish();
+      return;
+    }
+    send("progress", { progress: 15, stage: "Link validated" });
+
+    const result = await resolveUrl(validation.parsed.normalized, (progress, stage) => {
+      send("progress", { progress, stage });
+    });
+    if (settled) return;
+
+    const mediaId = generateToken();
+    storeMedia(mediaId, result.media, result.type);
+
+    const duration = Date.now() - startTime;
+    logger.info("Resolution complete", {
+      requestId,
+      duration,
+      provider: "resolved",
+      mediaCount: result.media.length,
+      mediaId,
+    });
+
+    const data = {
+      ...result,
+      sourceUrl: validation.parsed.normalized,
+      mediaId,
+    };
+    send("complete", { progress: 100, stage: "Media ready!", data });
+    finish();
+  } catch (error) {
+    if (settled) return;
+    sendError(error);
+  }
+});
+
 export default router;

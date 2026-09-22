@@ -1,4 +1,4 @@
-import type { ResolverResult } from "../types.js";
+import type { ResolverResult, ResolveProgressCallback } from "../types.js";
 
 function isPrivateOrReservedHost(hostname: string): boolean {
   if (
@@ -39,7 +39,7 @@ export function isCdnMediaHost(hostname: string): boolean {
 
 export abstract class BaseProvider {
   abstract readonly name: string;
-  abstract resolve(url: string): Promise<ResolverResult>;
+  abstract resolve(url: string, onProgress?: ResolveProgressCallback): Promise<ResolverResult>;
 
   protected validateMediaUrl(url: string): boolean {
     try {

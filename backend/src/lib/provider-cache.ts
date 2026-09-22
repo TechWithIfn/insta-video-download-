@@ -8,7 +8,7 @@ interface CacheEntry {
 
 const store = new Map<string, CacheEntry>();
 
-const TTL_MS = 5 * 60 * 1000;
+const TTL_MS = parseInt(process.env.RESOLVE_CACHE_TTL_MS || "120000", 10);
 const MAX_ENTRIES = 200;
 
 export function getCachedResult(url: string): ResolverResult | null {

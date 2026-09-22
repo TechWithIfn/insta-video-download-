@@ -3,6 +3,7 @@ import type {
   MediaItem,
   InstagramContentType,
   Author,
+  ResolveProgressCallback,
 } from "../types.js";
 import { BaseProvider, isCdnMediaHost } from "./base.js";
 import { createError } from "../errors.js";
@@ -18,8 +19,8 @@ async function getPuppeteer() {
   return pptr;
 }
 
-const NAVIGATION_TIMEOUT_MS = 20_000;
-const DATA_WAIT_TIMEOUT_MS = 8_000;
+const NAVIGATION_TIMEOUT_MS = 15_000;
+const DATA_WAIT_TIMEOUT_MS = 5_000;
 const MAX_CONCURRENT_PAGES = 3;
 const MOBILE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
@@ -498,7 +499,7 @@ export class PuppeteerProvider extends BaseProvider {
     };
   }
 
-  async resolve(url: string): Promise<ResolverResult> {
+  async resolve(url: string, onProgress?: ResolveProgressCallback): Promise<ResolverResult> {
     const startTime = Date.now();
     const timings: Record<string, number> = {};
 
@@ -510,6 +511,7 @@ export class PuppeteerProvider extends BaseProvider {
       const metaStart = Date.now();
       const fetchMeta = await fetchMetadata(url);
       timings.metadataMs = Date.now() - metaStart;
+      onProgress?.(35, "Media source opened");
 
       // Fast path: video pages usually expose og:video in plain HTML.
       // Skips Chromium entirely when the direct video URL is already known.
@@ -542,6 +544,7 @@ export class PuppeteerProvider extends BaseProvider {
         throw createError("PROVIDER_UNAVAILABLE");
       }
       timings.browserMs = Date.now() - browserStart;
+      onProgress?.(50, "Browser ready");
 
       if (!this.browser) {
         if (fetchMeta.ogImage) {
@@ -593,7 +596,10 @@ export class PuppeteerProvider extends BaseProvider {
         }
       });
 
-      // Intercept ALL responses to capture API data
+      // Intercept responses to capture API data with media URLs.
+      // Use a broad content check: Instagram serves media data from many
+      // different API endpoints (GraphQL, web API, feed, etc.) so we must
+      // check ALL JSON responses for media-related keywords.
       const interceptedMedia: ExtractedMedia[] = [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       page.on("response", async (res: any) => {
@@ -645,6 +651,7 @@ export class PuppeteerProvider extends BaseProvider {
         });
       }
       timings.navigationMs = Date.now() - navStart;
+      onProgress?.(65, "Page loaded");
 
       // Wait only for the data we actually need (video tag, article, or
       // video meta) instead of a blind multi-second sleep.
@@ -803,6 +810,7 @@ export class PuppeteerProvider extends BaseProvider {
         contentType,
         duration: Date.now() - startTime,
       });
+      onProgress?.(85, "Media extracted");
 
       return {
         type: contentType,

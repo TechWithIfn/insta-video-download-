@@ -89,8 +89,14 @@ export interface ResolverResult {
 
 export interface InstagramResolver {
   name: string;
-  resolve(url: string): Promise<ResolverResult>;
+  resolve(url: string, onProgress?: ResolveProgressCallback): Promise<ResolverResult>;
 }
+
+/**
+ * Optional progress hook for resolvers. Emitted only when a backend stage
+ * has ACTUALLY completed — never synthesized on a timer.
+ */
+export type ResolveProgressCallback = (progress: number, stage: string) => void;
 
 export interface TempStoreEntry {
   id: string;

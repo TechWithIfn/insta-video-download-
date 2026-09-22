@@ -33,6 +33,116 @@ function parseRangeHeader(header: string | undefined): ParsedRange | null {
   return { start, end };
 }
 
+function looksLikeMediaBytes(firstBytes: Uint8Array): boolean {
+  if (firstBytes.length < 8) return true;
+  const text = new TextDecoder("ascii", { fatal: false }).decode(firstBytes.slice(0, 64));
+  if (text.includes("<!DOCTYPE") || text.includes("<html") || text.includes("<HTML")) return false;
+  if (text.includes("<?xml")) return false;
+  if (text.startsWith("{") && (text.includes("login") || text.includes("error") || text.includes("requireLogin"))) return false;
+  for (let i = 0; i <= firstBytes.length - 4; i++) {
+    if (firstBytes[i] === 0x66 && firstBytes[i + 1] === 0x74 && firstBytes[i + 2] === 0x79 && firstBytes[i + 3] === 0x70) return true;
+  }
+  if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8) return true;
+  if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47) return true;
+  return false;
+}
+
+async function pipeWithValidation(
+  req: Request,
+  res: ExpressResponse,
+  body: ReadableStream<Uint8Array>,
+  maxBytes: number,
+  tag: string,
+  requestId: string
+): Promise<{ completed: boolean; bytes: number }> {
+  const reader = body.getReader();
+  let totalBytes = 0;
+  let finished = false;
+  let clientGone = false;
+  let validated = false;
+  const HEADROOM = 128;
+  const firstChunk: Uint8Array[] = [];
+  let headroomBytes = 0;
+
+  const onClientClose = () => {
+    if (!finished) {
+      clientGone = true;
+      reader.cancel().catch(() => {});
+      logger.warn(`[${tag}] client disconnected mid-stream`, { requestId, bytes: totalBytes });
+    }
+  };
+  req.on("close", onClientClose);
+
+  try {
+    while (true) {
+      if (clientGone) {
+        return { completed: false, bytes: totalBytes };
+      }
+      const { done, value } = await reader.read();
+      if (done) {
+        finished = true;
+        res.end();
+        return { completed: true, bytes: totalBytes };
+      }
+      totalBytes += value.length;
+      if (totalBytes > maxBytes) {
+        finished = true;
+        await reader.cancel().catch(() => {});
+        res.destroy();
+        logger.warn(`[${tag}] exceeded size limit mid-stream`, { requestId, bytes: totalBytes });
+        return { completed: false, bytes: totalBytes };
+      }
+      if (!validated) {
+        firstChunk.push(value);
+        headroomBytes += value.length;
+        if (headroomBytes >= HEADROOM) {
+          const combined = new Uint8Array(headroomBytes);
+          let offset = 0;
+          for (const chunk of firstChunk) {
+            combined.set(chunk, offset);
+            offset += chunk.length;
+          }
+          if (!looksLikeMediaBytes(combined)) {
+            finished = true;
+            await reader.cancel().catch(() => {});
+            logger.warn(`[${tag}] upstream returned non-media content`, { requestId });
+            const err = createError("MEDIA_URL_EXPIRED");
+            res.status(err.statusCode).json(err.toResponse());
+            return { completed: false, bytes: totalBytes };
+          }
+          validated = true;
+          for (const chunk of firstChunk) {
+            try {
+              const canContinue = res.write(chunk);
+              if (!canContinue) {
+                await new Promise<void>((resolve) => res.once("drain", () => resolve()));
+              }
+            } catch {
+              finished = true;
+              await reader.cancel().catch(() => {});
+              return { completed: false, bytes: totalBytes };
+            }
+          }
+          firstChunk.length = 0;
+        }
+        continue;
+      }
+      try {
+        const canContinue = res.write(value);
+        if (!canContinue) {
+          await new Promise<void>((resolve) => res.once("drain", () => resolve()));
+        }
+      } catch {
+        finished = true;
+        await reader.cancel().catch(() => {});
+        return { completed: false, bytes: totalBytes };
+      }
+    }
+  } finally {
+    req.off("close", onClientClose);
+  }
+}
+
 async function pipeRangeSlice(
   req: Request,
   res: ExpressResponse,
@@ -254,7 +364,7 @@ router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
       return;
     }
 
-    // Case 3: full 200 stream
+    // Case 3: full 200 stream — validate first bytes are actually media
     const contentLength = response.headers.get("content-length");
     if (contentLength) {
       if (parseInt(contentLength, 10) > MAX_STREAM_BYTES) {
@@ -265,7 +375,7 @@ router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
       res.setHeader("Content-Length", contentLength);
     }
     logger.info("[STREAM] full 200 stream started", { requestId });
-    const result = await pipeUpstreamToClient(req, res, response.body, MAX_STREAM_BYTES, "STREAM", requestId);
+    const result = await pipeWithValidation(req, res, response.body, MAX_STREAM_BYTES, "STREAM", requestId);
     logger.info("[STREAM] full stream completed", {
       requestId,
       completed: result.completed,

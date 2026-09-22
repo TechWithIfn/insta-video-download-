@@ -431,3 +431,13 @@ button:focus-visible {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Clamp tall 9:16 media frames on short viewports so the video keeps its
+   aspect ratio (object-contain letterboxes) while controls stay reachable
+   without excessive scrolling. Wide/tall screens are unaffected. */
+@media (max-height: 780px) {
+  .media-frame {
+    max-height: calc(100vh - 360px);
+    max-height: calc(100dvh - 360px);
+  }
+}

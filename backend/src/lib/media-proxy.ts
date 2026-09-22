@@ -2,6 +2,17 @@ import type { Request, Response as ExpressResponse } from "express";
 import { isPrivateOrReservedHost, isCdnMediaHost } from "./providers/base.js";
 import { logger } from "./logger.js";
 
+function isInstagramHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return h === "instagram.com" || h.endsWith(".instagram.com");
+}
+
+function isAllowedRedirectHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (isPrivateOrReservedHost(h)) return false;
+  return isCdnMediaHost(h) || isInstagramHost(h);
+}
+
 export function isAllowedMediaUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
@@ -119,11 +130,25 @@ export async function fetchUpstreamMedia(
       } catch {
         return { kind: "bad-redirect", location: location.slice(0, 120) };
       }
-      const validation = validateProxyUrl(nextUrl);
-      if (!validation.ok) {
+      let nextParsed: URL;
+      try {
+        nextParsed = new URL(nextUrl);
+      } catch {
+        return { kind: "bad-redirect", location: nextUrl.slice(0, 120) };
+      }
+      const nextHost = nextParsed.hostname.toLowerCase();
+      if (nextParsed.protocol !== "https:" || isPrivateOrReservedHost(nextHost)) {
         logger.warn(`[${tag}] blocked redirect to unsafe destination`, {
           requestId,
-          error: validation.error,
+          hostname: nextHost,
+          location: nextUrl.slice(0, 120),
+        });
+        return { kind: "bad-redirect", location: nextUrl.slice(0, 120) };
+      }
+      if (!isAllowedRedirectHost(nextHost)) {
+        logger.warn(`[${tag}] blocked redirect to non-allowed host`, {
+          requestId,
+          hostname: nextHost,
           location: nextUrl.slice(0, 120),
         });
         return { kind: "bad-redirect", location: nextUrl.slice(0, 120) };
@@ -131,7 +156,7 @@ export async function fetchUpstreamMedia(
       logger.info(`[${tag}] following redirect`, {
         requestId,
         hop: hop + 1,
-        to: validation.value.hostname,
+        to: nextHost,
       });
       currentUrl = nextUrl;
       continue;

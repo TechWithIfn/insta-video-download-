@@ -17,10 +17,12 @@ import {
   Music,
 } from "lucide-react";
 import {
-  resolveInstagramUrl,
+  startResolveStream,
   getStreamUrl,
   getDownloadUrl,
+  getApiBase,
   type ResolveData,
+  type ResolveStreamHandle,
 } from "@/services/api";
 import { useLanguage } from "@/i18n";
 import type { Strings } from "@/i18n/types";
@@ -95,29 +97,59 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-// ─── Skeleton ─────────────────────────────────────────────
+// ─── Circular progress (REAL backend stages only) ────────────
+// The value shown here comes exclusively from `progress` SSE events sent
+// by the backend after each resolution stage actually completes. This
+// component never advances itself on a timer.
+const PROGRESS_RING_ID = "snapsave-progress-ring";
 
-function SkeletonLoader() {
+function CircularProgress({ value, label }: { value: number; label: string }) {
   const { t } = useLanguage();
+  const clamped = Math.max(0, Math.min(100, Math.round(value)));
+  const R = 52;
+  const C = 2 * Math.PI * R;
+  const offset = C - (C * clamped) / 100;
   return (
     <div className="animate-fade-in-up mx-auto mt-10 max-w-[380px] px-4 sm:px-5">
       <div
-        className="overflow-hidden rounded-[28px] p-4"
+        className="flex flex-col items-center rounded-[28px] px-6 py-8 text-center"
         style={{ background: "var(--card)", boxShadow: "0 20px 60px rgba(60,40,120,0.12)", border: "1px solid var(--border)" }}
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={clamped}
+        aria-label={t.hero.analyzing}
       >
-        <div className="flex items-center gap-3 px-1 pb-3">
-          <div className="h-6 w-16 animate-shimmer rounded-full" />
-          <div className="h-5 w-28 animate-shimmer rounded-md" />
+        <div className="relative h-[132px] w-[132px]">
+          <svg width="132" height="132" viewBox="0 0 132 132" aria-hidden="true">
+            <defs>
+              <linearGradient id={PROGRESS_RING_ID} x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#7c4df5" />
+                <stop offset="55%" stopColor="#ec5fa8" />
+                <stop offset="100%" stopColor="#f58e5b" />
+              </linearGradient>
+            </defs>
+            <circle cx="66" cy="66" r={R} fill="none" strokeWidth="11" style={{ stroke: "var(--border)" }} />
+            <circle
+              cx="66"
+              cy="66"
+              r={R}
+              fill="none"
+              stroke={`url(#${PROGRESS_RING_ID})`}
+              strokeWidth="11"
+              strokeLinecap="round"
+              strokeDasharray={C}
+              strokeDashoffset={offset}
+              transform="rotate(-90 66 66)"
+              style={{ transition: "stroke-dashoffset 0.35s ease" }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-[26px] font-extrabold tabular-nums text-fg">{clamped}%</span>
+          </div>
         </div>
-        <div className="aspect-[9/16] w-full animate-shimmer rounded-[20px] bg-border-light" />
-        <div className="mt-3 flex items-center justify-between px-1">
-          <div className="h-3 w-24 animate-shimmer rounded-md" />
-          <div className="h-10 w-28 animate-shimmer rounded-xl" />
-        </div>
+        <p className="mt-4 text-[14px] font-semibold text-fg">{label}</p>
       </div>
-      <p className="mt-3 text-center text-sm text-fg-subtle animate-pulse">
-        {t.hero.analyzing}
-      </p>
     </div>
   );
 }
@@ -132,6 +164,8 @@ function VideoPlayer({ src, poster }: { src: string; poster?: string }) {
   const [currentTime, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
   const [mediaError, setMediaError] = useState(false);
+  const retryCountRef = useRef(0);
+  const [currentSrc, setCurrentSrc] = useState(src);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -141,19 +175,30 @@ function VideoPlayer({ src, poster }: { src: string; poster?: string }) {
     const onTime = () => setCurrent(v.currentTime);
     const onMeta = () => setDuration(v.duration);
     const onEnd = () => { setPlaying(false); setCurrent(0); };
+    const onError = () => {
+      if (retryCountRef.current < 1) {
+        retryCountRef.current++;
+        const bust = currentSrc.includes("?") ? "&" : "?";
+        setCurrentSrc(`${currentSrc}${bust}_retry=${Date.now()}`);
+      } else {
+        setMediaError(true);
+      }
+    };
     v.addEventListener("play", onPlay);
     v.addEventListener("pause", onPause);
     v.addEventListener("timeupdate", onTime);
     v.addEventListener("loadedmetadata", onMeta);
     v.addEventListener("ended", onEnd);
+    v.addEventListener("error", onError);
     return () => {
       v.removeEventListener("play", onPlay);
       v.removeEventListener("pause", onPause);
       v.removeEventListener("timeupdate", onTime);
       v.removeEventListener("loadedmetadata", onMeta);
       v.removeEventListener("ended", onEnd);
+      v.removeEventListener("error", onError);
     };
-  }, []);
+  }, [currentSrc]);
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
@@ -187,15 +232,14 @@ function VideoPlayer({ src, poster }: { src: string; poster?: string }) {
 
   return (
     <div className="relative overflow-hidden rounded-[20px]" style={{ background: "#0a0a14" }}>
-      <div className="relative w-full" style={{ aspectRatio: "9/16" }}>
+      <div className="relative w-full media-frame" style={{ aspectRatio: "9/16" }}>
         <video
           ref={videoRef}
-          src={src}
+          src={currentSrc}
           poster={poster || undefined}
           playsInline
           preload="metadata"
           className="absolute inset-0 h-full w-full object-contain"
-          onError={() => setMediaError(true)}
         />
 
         {/* Play / Pause button */}
@@ -399,7 +443,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
     if (audioUrl || audioError) return;
 
     const controller = new AbortController();
-    const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
+    const API_BASE = getApiBase();
     const fallback = audioFallbackRef.current;
 
     fetch(`${API_BASE}/api/audio`, {
@@ -432,15 +476,11 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
     try {
       const safeHandle = sanitizeHandle(result.author?.username);
       const filename = `${safeHandle}-video.mp4`;
-      // `source` lets the backend re-resolve the post if this CDN URL has
-      // expired since the preview was fetched.
       const downloadUrl = getDownloadUrl(firstMedia.url, filename, result.sourceUrl);
-      // Hidden-anchor navigation: the backend responds with
-      // Content-Disposition: attachment, so the browser saves the file
-      // without leaving the page. No direct CDN access from the browser.
       const a = document.createElement("a");
       a.href = downloadUrl;
       a.rel = "noopener";
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -448,11 +488,9 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
       setDownloading("error");
       return;
     }
-    // Navigation-triggered downloads cannot report completion back to the
-    // page, so restore the idle state shortly after initiating.
     window.setTimeout(() => {
       setDownloading((s) => (s === "preparing" ? "idle" : s));
-    }, 2500);
+    }, 4000);
   }, [firstMedia, result.author, result.sourceUrl, downloading]);
 
   const handleDownloadAudio = useCallback(() => {
@@ -470,7 +508,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   const streamSrc = firstMedia ? getStreamUrl(firstMedia.url, result.sourceUrl) : "";
 
   return (
-    <div className="animate-fade-in-up mx-auto mt-10 px-4 sm:px-5" style={{ width: "min(100% - 32px, 400px)" }}>
+    <div className="animate-fade-in-up mx-auto mt-10 px-4 sm:px-5" style={{ width: "min(100%, 440px)", maxWidth: "calc(100vw - 24px)" }}>
       <div
         className="overflow-hidden rounded-[28px] p-4"
         style={{ background: "var(--card)", boxShadow: "0 20px 60px rgba(60,40,120,0.12)", border: "1px solid var(--border)" }}
@@ -562,9 +600,9 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
           <button
             type="button"
             onClick={isAudio ? handleDownloadAudio : handleDownloadVideo}
-            disabled={(isAudio && !audioUrl) || downloading === "preparing" || audioLoading}
+            disabled={(isAudio && !audioUrl) || downloading === "preparing" || (isAudio && audioLoading)}
             aria-label={isAudio ? t.result.downloadAudioLabel : t.result.downloadVideoLabel}
-            className="gradient-btn h-12 min-h-[48px] flex-1 text-[14px] sm:h-10 sm:min-h-0"
+            className="gradient-btn h-12 min-h-[48px] flex-1 text-[14px] sm:h-11 sm:min-h-[44px]"
           >
             {downloading === "preparing" ? (
               <>
@@ -609,7 +647,43 @@ export default function HeroDownloader() {
   const [error, setError] = useState("");
   const [state, setState] = useState<UIState>("IDLE");
   const [result, setResult] = useState<ResolveData | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>("photos");
+  // Default to the primary mode (Reels). The tab is ONLY ever changed by an
+  // explicit user click — resolve results, validation and errors never touch it.
+  const [activeTab, setActiveTab] = useState<TabId>("reels");
+  // Real processing progress: updated exclusively from backend SSE stage
+  // events. Never advanced by timers.
+  const [progress, setProgress] = useState(0);
+  const [progressStage, setProgressStage] = useState("");
+  const streamRef = useRef<ResolveStreamHandle | null>(null);
+  const requestSeqRef = useRef(0);
+  const watchdogRef = useRef<number | null>(null);
+
+  const clearWatchdog = useCallback(() => {
+    if (watchdogRef.current !== null) {
+      window.clearTimeout(watchdogRef.current);
+      watchdogRef.current = null;
+    }
+  }, []);
+
+  const closeStream = useCallback(() => {
+    streamRef.current?.close();
+    streamRef.current = null;
+  }, []);
+
+  const invalidateRequest = useCallback(() => {
+    // Supersede any in-flight stream so a late event can never paint a
+    // stale result over the current request.
+    requestSeqRef.current++;
+    closeStream();
+    clearWatchdog();
+  }, [closeStream, clearWatchdog]);
+
+  // Cleanup on unmount: supersede any in-flight stream and stop the watchdog.
+  useEffect(() => {
+    return () => {
+      invalidateRequest();
+    };
+  }, [invalidateRequest]);
 
   const handlePaste = useCallback(async () => {
     try {
@@ -622,19 +696,25 @@ export default function HeroDownloader() {
   }, []);
 
   const handleClear = useCallback(() => {
+    invalidateRequest();
     setUrl("");
     setError("");
     setState("IDLE");
     setResult(null);
-  }, []);
+    setProgress(0);
+    setProgressStage("");
+  }, [invalidateRequest]);
 
   const handleRetry = useCallback(() => {
+    invalidateRequest();
     setError("");
     setState("IDLE");
-  }, []);
+    setProgress(0);
+    setProgressStage("");
+  }, [invalidateRequest]);
 
   const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
+    (e: React.FormEvent) => {
       e.preventDefault();
       const trimmed = url.trim();
       if (!trimmed) {
@@ -647,23 +727,49 @@ export default function HeroDownloader() {
         setState("ERROR");
         return;
       }
-      setState("PREPARING");
+      // Single active request: supersede anything still in flight so rapid
+      // clicks can never spawn parallel resolutions.
+      invalidateRequest();
+      const seq = ++requestSeqRef.current;
+      setResult(null);
       setError("");
-      try {
-        const data = await resolveInstagramUrl(trimmed);
-        if (!data.success) {
-          setError(data.error?.message || t.errors.failed);
-          setState("ERROR");
-          return;
-        }
-        setResult(data.data);
-        setState("SUCCESS");
-      } catch {
+      setProgress(0);
+      setProgressStage(t.hero.analyzing);
+      setState("PREPARING");
+      // Watchdog only: fires if the backend goes completely silent. It never
+      // touches the progress value itself.
+      watchdogRef.current = window.setTimeout(() => {
+        if (requestSeqRef.current !== seq) return;
+        closeStream();
         setError(t.errors.unreachable);
         setState("ERROR");
-      }
+      }, 25000);
+      const handle = startResolveStream(trimmed, {
+        onProgress: (p, stage) => {
+          if (requestSeqRef.current !== seq) return;
+          setProgress(p);
+          if (stage) setProgressStage(stage);
+        },
+        onComplete: (data) => {
+          if (requestSeqRef.current !== seq) return;
+          clearWatchdog();
+          closeStream();
+          setProgress(100);
+          setProgressStage("");
+          setResult(data);
+          setState("SUCCESS");
+        },
+        onError: (err) => {
+          if (requestSeqRef.current !== seq) return;
+          clearWatchdog();
+          closeStream();
+          setError(err.message || t.errors.failed);
+          setState("ERROR");
+        },
+      });
+      streamRef.current = handle;
     },
-    [url, t]
+    [url, t, invalidateRequest, clearWatchdog, closeStream]
   );
 
   const isAudioMode = activeTab === "audio";
@@ -750,7 +856,7 @@ export default function HeroDownloader() {
             >
               {/* Desktop: horizontal */}
               <div className="hidden sm:flex sm:flex-row sm:gap-2">
-                <div className="relative flex-1">
+                <div className="relative min-w-0 flex-1">
                   <LinkIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-fg-subtle" />
                   <input
                     type="text"
@@ -902,7 +1008,9 @@ export default function HeroDownloader() {
 
         {/* Result / Error Area */}
         <div aria-live="polite" aria-atomic="true">
-          {state === "PREPARING" && <SkeletonLoader />}
+          {state === "PREPARING" && (
+            <CircularProgress value={progress} label={progressStage || t.hero.analyzing} />
+          )}
 
           {state === "SUCCESS" && result && (
             <MediaResult
