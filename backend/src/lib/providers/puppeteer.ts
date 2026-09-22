@@ -25,7 +25,7 @@ const MAX_CONCURRENT_PAGES = 3;
 const MOBILE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
-interface ExtractedMedia {
+export interface ExtractedMedia {
   url: string;
   type: "video" | "image";
   width: number | null;
@@ -47,7 +47,7 @@ function unescapeInstagramString(s: string): string {
     .replace(/&amp;/g, "&");
 }
 
-function extractMediaFromJson(text: string): ExtractedMedia[] {
+export function extractMediaFromJson(text: string): ExtractedMedia[] {
   const media: ExtractedMedia[] = [];
   const seen = new Set<string>();
 
@@ -217,6 +217,19 @@ function extractDescriptionFromHtml(html: string): string | null {
   return descMatch ? unescapeInstagramString(descMatch[1]) : null;
 }
 
+/**
+ * For Reel/Video content the playable item must win: provider responses may
+ * list thumbnails/posters before the actual video. Stable sort — videos
+ * first (discovery order preserved), everything else untouched. Other
+ * content types keep provider order (carousels keep per-item types/order).
+ */
+export function sortVideoFirst(media: MediaItem[], contentType: InstagramContentType): MediaItem[] {
+  if (contentType !== "REEL" && contentType !== "VIDEO") return media;
+  const videos = media.filter((m) => m.type === "video");
+  if (videos.length === 0) return media;
+  return [...videos, ...media.filter((m) => m.type !== "video")];
+}
+
 const FETCH_META_FN = `
 (function() {
   var result = { videos: [], images: [], hasArticle: false, bodySnippet: '' };
@@ -321,7 +334,7 @@ function isTrustedCdnUrl(raw: string): boolean {
   }
 }
 
-async function fetchMetadata(url: string): Promise<{
+export async function fetchMetadata(url: string): Promise<{
   ogImage: string | null;
   ogVideo: string | null;
   title: string | null;
@@ -375,7 +388,19 @@ async function fetchMetadata(url: string): Promise<{
       html.match(/name=["']twitter:player:stream["'][^>]*content=["']([^"']+)["']/);
 
     const rawImage = ogImageMatch ? unescapeInstagramString(ogImageMatch[1]) : null;
-    const rawVideo = ogVideoMatch ? unescapeInstagramString(ogVideoMatch[1]) : null;
+    let rawVideo = ogVideoMatch ? unescapeInstagramString(ogVideoMatch[1]) : null;
+
+    // No-browser fallback scan: some pages embed video data as JSON without
+    // an og:video tag. Same patterns (and CDN trust gate below) as the
+    // Puppeteer interception path, so serverless resolves gain coverage.
+    if (!rawVideo) {
+      for (const item of extractMediaFromJson(html)) {
+        if (item.type === "video") {
+          rawVideo = item.url;
+          break;
+        }
+      }
+    }
 
     return {
       ogImage: rawImage && isTrustedCdnUrl(rawImage) ? rawImage : null,
@@ -739,6 +764,12 @@ export class PuppeteerProvider extends BaseProvider {
         addUnique({ url: src, type: "image", width: null, height: null });
       }
 
+      // Server-side metadata may already hold a trusted video URL (og:video
+      // or embedded page JSON). Seed it first so video posts are covered
+      // even when the browser pass finds nothing new.
+      if (fetchMeta.ogVideo && !seenUrls.has(fetchMeta.ogVideo)) {
+        addUnique({ url: fetchMeta.ogVideo, type: "video", width: null, height: null });
+      }
       if (fetchMeta.ogImage && !seenUrls.has(fetchMeta.ogImage)) {
         addUnique({ url: fetchMeta.ogImage, type: "image", width: null, height: null });
       }
@@ -781,6 +812,7 @@ export class PuppeteerProvider extends BaseProvider {
       }
 
       const contentType = this.detectContentType(url);
+      const orderedMedia = sortVideoFirst(validMedia, contentType);
 
       const author =
         fetchMeta.author ||
@@ -818,7 +850,7 @@ export class PuppeteerProvider extends BaseProvider {
         thumbnail,
         title,
         author: decodedAuthor,
-        media: validMedia,
+        media: orderedMedia,
       };
     } catch (error) {
       if (error && typeof error === "object" && "code" in error) throw error;

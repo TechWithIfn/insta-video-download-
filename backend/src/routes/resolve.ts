@@ -10,6 +10,22 @@ import type { ResolveResponse, ResolveErrorResponse } from "../lib/types.js";
 
 const router = Router();
 
+/** [SnapSave Media Debug] first-item type + hostname only (never query/tokens). */
+function firstMediaDiag(media: { type: string; url: string }[]): {
+  firstMediaType: string | null;
+  firstMediaHost: string | null;
+} {
+  const first = media[0];
+  if (!first) return { firstMediaType: null, firstMediaHost: null };
+  let host: string | null = null;
+  try {
+    host = new URL(first.url).hostname;
+  } catch {
+    host = null;
+  }
+  return { firstMediaType: first.type, firstMediaHost: host };
+}
+
 router.post("/", async (req: Request, res: Response): Promise<void> => {
   const requestId = generateToken();
   const startTime = Date.now();
@@ -85,6 +101,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       provider: "resolved",
       mediaCount: result.media.length,
       mediaId,
+      ...firstMediaDiag(result.media),
     });
 
     const response: ResolveResponse = {
@@ -264,6 +281,7 @@ router.get("/stream", async (req: Request, res: Response): Promise<void> => {
       provider: "resolved",
       mediaCount: result.media.length,
       mediaId,
+      ...firstMediaDiag(result.media),
     });
 
     const data = {

@@ -449,7 +449,9 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
     audioFallbackRef.current = t.result.audioErrorFallback;
   });
 
-  const firstMedia = result.media[0];
+  // Never assume media[0] is the playable item: prefer actual video so a
+  // thumbnail listed first can never demote a Reel to a photo.
+  const firstMedia = result.media.find((m) => m.type === "video") ?? result.media[0];
   const isAudio = mode === "audio";
 
   // For audio mode: fetch the MP3 from the backend
