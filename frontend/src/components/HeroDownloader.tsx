@@ -17,6 +17,7 @@ import {
   Music,
 } from "lucide-react";
 import {
+  resolveInstagramUrl,
   startResolveStream,
   getStreamUrl,
   getDownloadUrl,
@@ -722,6 +723,7 @@ export default function HeroDownloader() {
   const streamRef = useRef<ResolveStreamHandle | null>(null);
   const requestSeqRef = useRef(0);
   const watchdogRef = useRef<number | null>(null);
+  const postAbortRef = useRef<AbortController | null>(null);
 
   const clearWatchdog = useCallback(() => {
     if (watchdogRef.current !== null) {
@@ -741,6 +743,8 @@ export default function HeroDownloader() {
     requestSeqRef.current++;
     closeStream();
     clearWatchdog();
+    postAbortRef.current?.abort();
+    postAbortRef.current = null;
   }, [closeStream, clearWatchdog]);
 
   // Cleanup on unmount: supersede any in-flight stream and stop the watchdog.
@@ -805,10 +809,15 @@ export default function HeroDownloader() {
       // touches the progress value itself.
       watchdogRef.current = window.setTimeout(() => {
         if (requestSeqRef.current !== seq) return;
+        requestSeqRef.current++;
         closeStream();
+        postAbortRef.current?.abort();
+        postAbortRef.current = null;
         setError(t.errors.unreachable);
         setState("ERROR");
       }, 25000);
+      const postController = new AbortController();
+      postAbortRef.current = postController;
       const handle = startResolveStream(trimmed, {
         onProgress: (p, stage) => {
           if (requestSeqRef.current !== seq) return;
@@ -830,6 +839,35 @@ export default function HeroDownloader() {
           closeStream();
           setError(err.message || t.errors.failed);
           setState("ERROR");
+        },
+        onTransportError: () => {
+          if (requestSeqRef.current !== seq) return;
+          // The event stream dropped without a server verdict — fall back to
+          // one plain POST resolve (same URL coalesces server-side) instead
+          // of reporting a false connection failure.
+          resolveInstagramUrl(trimmed, postController.signal)
+            .then((data) => {
+              if (requestSeqRef.current !== seq) return;
+              clearWatchdog();
+              closeStream();
+              if (!data.success) {
+                setError(data.error?.message || t.errors.failed);
+                setState("ERROR");
+                return;
+              }
+              setProgress(100);
+              setProgressStage("");
+              setResult(data.data);
+              setState("SUCCESS");
+            })
+            .catch((err) => {
+              if (requestSeqRef.current !== seq) return;
+              if (err instanceof DOMException && err.name === "AbortError") return;
+              clearWatchdog();
+              closeStream();
+              setError(t.errors.unreachable);
+              setState("ERROR");
+            });
         },
       });
       streamRef.current = handle;

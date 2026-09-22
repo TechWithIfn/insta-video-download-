@@ -60,6 +60,14 @@ export interface ResolveStreamHandlers {
   onProgress: (progress: number, stage: string) => void;
   onComplete: (data: ResolveData) => void;
   onError: (error: { code: string; message: string }) => void;
+  /**
+   * Transport-level failure: the stream dropped without any server payload
+   * (network cut, proxy timeout, blocked EventSource). When provided, the
+   * caller owns recovery (e.g. one plain POST fallback) and this function
+   * reports nothing itself. Otherwise a generic connection error is sent
+   * to onError.
+   */
+  onTransportError?: () => void;
 }
 
 export interface ResolveStreamHandle {
@@ -83,8 +91,12 @@ export function startResolveStream(url: string, handlers: ResolveStreamHandlers)
     }
   };
   const transportError = () => {
-    handlers.onError({ code: "TEMPORARY_ERROR", message: "Connection to the server was lost." });
     close();
+    if (handlers.onTransportError) {
+      handlers.onTransportError();
+      return;
+    }
+    handlers.onError({ code: "TEMPORARY_ERROR", message: "Connection to the server was lost." });
   };
 
   es.addEventListener("progress", (e) => {

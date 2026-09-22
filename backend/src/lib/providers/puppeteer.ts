@@ -19,6 +19,17 @@ async function getPuppeteer() {
   return pptr;
 }
 
+/**
+ * Serverless detection: Vercel sets VERCEL=1 automatically. PUPPETEER_RUNTIME
+ * allows an explicit override ("serverless" | "local"); otherwise auto-detect.
+ */
+export function isServerlessRuntime(): boolean {
+  const override = (process.env.PUPPETEER_RUNTIME || "").toLowerCase();
+  if (override === "serverless") return true;
+  if (override === "local") return false;
+  return Boolean(process.env.VERCEL);
+}
+
 const NAVIGATION_TIMEOUT_MS = 15_000;
 const DATA_WAIT_TIMEOUT_MS = 5_000;
 const MAX_CONCURRENT_PAGES = 3;
@@ -431,22 +442,26 @@ export class PuppeteerProvider extends BaseProvider {
     }
 
     this.launching = (async () => {
-      const p = await getPuppeteer();
-      this.browser = await p.default.launch({
-        headless: true,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-gpu",
-          "--disable-web-security",
-          "--disable-features=VizDisplayCompositor",
-          "--no-first-run",
-          "--no-default-browser-check",
-          "--disable-extensions",
-          "--disable-blink-features=AutomationControlled",
-        ],
-      });
+      if (isServerlessRuntime()) {
+        await this.launchServerless();
+      } else {
+        const p = await getPuppeteer();
+        this.browser = await p.default.launch({
+          headless: true,
+          args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--disable-web-security",
+            "--disable-features=VizDisplayCompositor",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-extensions",
+            "--disable-blink-features=AutomationControlled",
+          ],
+        });
+      }
 
       // Apply stealth patches manually
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -460,6 +475,38 @@ export class PuppeteerProvider extends BaseProvider {
     })();
 
     await this.launching;
+  }
+
+  /**
+   * Vercel/serverless launch path: headless-shell Chromium provided by
+   * @sparticuz/chromium, driven via puppeteer-core. No locally installed
+   * Chrome is used or required. The local launch path above is untouched.
+   */
+  private async launchServerless(): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const coreMod = (await import("puppeteer-core")) as any;
+    const core = coreMod.default ?? coreMod;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chromiumMod = (await import("@sparticuz/chromium")) as any;
+    const chromium = chromiumMod.default ?? chromiumMod;
+
+    // No WebGL needed for DOM/API extraction; skips swiftshader extraction.
+    chromium.setGraphicsMode = false;
+    const executablePath: string = await chromium.executablePath();
+    const defaultArgsFn =
+      typeof core.defaultArgs === "function" ? core.defaultArgs.bind(core) : null;
+    const args: string[] = defaultArgsFn
+      ? await defaultArgsFn({ args: chromium.args, headless: "shell" })
+      : [...(chromium.args as string[])];
+
+    this.browser = await core.launch({
+      args,
+      defaultViewport: { width: 375, height: 812, isMobile: true, hasTouch: true },
+      executablePath,
+      headless: "shell",
+    });
+
+    logger.info("Puppeteer serverless browser launched (@sparticuz/chromium)");
   }
 
   /** Bounded page concurrency: fail fast instead of spawning unlimited pages. */
@@ -592,8 +639,9 @@ export class PuppeteerProvider extends BaseProvider {
         "X-IG-App-ID": "936619743392459",
       });
 
-      // Block heavy resources we never need: extraction reads media URLs
-      // from markup and JSON payloads, never from downloaded bytes.
+      // Block heavy resources we never need, but NEVER abort video/media
+      // requests: media delivery responses (resourceType "media",
+      // video/*) and <video> currentSrc are primary extraction signals.
       // Scripts/XHR/fetch stay enabled — API JSON interception depends on them.
       await page.setRequestInterception(true).catch(() => {});
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -603,7 +651,6 @@ export class PuppeteerProvider extends BaseProvider {
           const target = intercepted.url();
           if (
             type === "image" ||
-            type === "media" ||
             type === "font" ||
             type === "stylesheet" ||
             /googletagmanager|google-analytics|facebook\.net\/tr|connect\.facebook/i.test(target)
