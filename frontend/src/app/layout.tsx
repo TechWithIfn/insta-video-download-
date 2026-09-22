@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Poppins, Lora } from "next/font/google";
 import { LanguageProvider } from "@/i18n";
 import "./globals.css";
@@ -37,6 +37,17 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f4fa" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e0c1b" },
+  ],
 };
 
 export default function RootLayout({

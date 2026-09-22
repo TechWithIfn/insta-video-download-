@@ -111,7 +111,7 @@ function CircularProgress({ value, label }: { value: number; label: string }) {
   const C = 2 * Math.PI * R;
   const offset = C - (C * clamped) / 100;
   return (
-    <div className="animate-fade-in-up mx-auto mt-10 max-w-[380px] px-4 sm:px-5">
+    <div className="animate-fade-in-up mx-auto mt-6 w-full sm:mt-10" style={{ maxWidth: "380px" }}>
       <div
         className="flex flex-col items-center rounded-[28px] px-6 py-8 text-center"
         style={{ background: "var(--card)", boxShadow: "0 20px 60px rgba(60,40,120,0.12)", border: "1px solid var(--border)" }}
@@ -257,7 +257,7 @@ function VideoPlayer({ src, poster, mediaType }: { src: string; poster?: string;
         <button
           type="button"
           onClick={togglePlay}
-          className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full backdrop-blur-md transition-transform hover:scale-105 active:scale-95"
+          className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full backdrop-blur-md transition-transform hover:scale-105 active:scale-95 sm:h-16 sm:w-16"
           style={{ background: "rgba(255,255,255,0.18)", border: "1.5px solid rgba(255,255,255,0.25)" }}
           aria-label={playing ? t.result.pauseVideo : t.result.playVideo}
         >
@@ -555,23 +555,23 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   }, [firstMedia, streamSrc, logPreviewDiag]);
 
   return (
-    <div className="animate-fade-in-up mx-auto mt-10 px-4 sm:px-5" style={{ width: "min(100%, 440px)", maxWidth: "calc(100vw - 24px)" }}>
+    <div className="animate-fade-in-up mx-auto mt-6 w-full sm:mt-10 sm:px-5" style={{ maxWidth: "440px" }}>
       <div
-        className="overflow-hidden rounded-[28px] p-4"
+        className="result-card overflow-hidden rounded-[28px] p-3 sm:p-4"
         style={{ background: "var(--card)", boxShadow: "0 20px 60px rgba(60,40,120,0.12)", border: "1px solid var(--border)" }}
       >
         {/* Top Row */}
-        <div className="flex items-center justify-between px-1 pb-3">
+        <div className="result-top-row flex items-center justify-between gap-2 px-1 pb-3">
           <span
-            className="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold text-white"
+            className="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-bold text-white sm:px-3 sm:text-xs"
             style={{ background: isAudio ? "linear-gradient(135deg, #7c4df5, #ec5fa8)" : "var(--brand-gradient)" }}
           >
             {isAudio ? t.result.audio : getContentTypeLabel(result.type, t.typeBadges)}
           </span>
           {result.author && (
-            <div className="flex items-center gap-2">
-              <div className="h-[22px] w-[22px] rounded-full" style={{ background: "var(--brand-gradient)" }} />
-              <span className="text-[14px] font-semibold text-fg">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              <div className="h-[22px] w-[22px] shrink-0 rounded-full" style={{ background: "var(--brand-gradient)" }} />
+              <span className="result-username text-[13px] font-semibold text-fg sm:text-[14px]">
                 @{result.author.username}
               </span>
             </div>
@@ -579,9 +579,9 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
           <button
             type="button"
             onClick={onReset}
-            className="text-[13px] font-semibold text-fg-subtle transition-colors hover:text-fg"
+            className="flex min-h-[44px] shrink-0 items-center px-1 text-[13px] font-semibold text-fg-subtle transition-colors hover:text-fg"
           >
-            <X className="inline h-3.5 w-3.5 mr-0.5" />
+            <X className="mr-0.5 inline h-3.5 w-3.5" />
             {t.result.newBtn}
           </button>
         </div>
@@ -589,7 +589,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
         {/* Caption (one block, max 2 lines) */}
         {result.title && (
           <div className="px-1 pb-3">
-            <p className="text-[13px] leading-[1.5] text-fg-muted line-clamp-2">
+            <p className="text-[13px] leading-[1.5] text-fg-muted line-clamp-2 break-words">
               {decodeHtmlEntities(result.title)}
             </p>
           </div>
@@ -610,39 +610,45 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
             {audioError && (
               <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-danger-light">
                 <AlertCircle className="h-8 w-8 text-danger" />
-                <p className="text-xs text-danger text-center px-4">{audioError}</p>
+                <p className="text-xs text-danger text-center px-4 break-words">{audioError}</p>
               </div>
             )}
             {audioUrl && <AudioPlayer src={audioUrl} />}
           </>
         ) : !firstMedia ? null : firstMedia.type === "video" ? (
-          <VideoPlayer
-            key={firstMedia.url}
-            src={streamSrc}
-            poster={firstMedia.thumbnail || undefined}
-            mediaType={firstMedia.type}
-          />
+          <div className="result-video-wrap">
+            <VideoPlayer
+              key={firstMedia.url}
+              src={streamSrc}
+              poster={firstMedia.thumbnail || undefined}
+              mediaType={firstMedia.type}
+            />
+          </div>
         ) : imgFailed ? (
-          <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-black/5">
-            <ImageIcon className="h-10 w-10" style={{ color: "var(--fg-subtle)", opacity: 0.4 }} />
-            <p className="text-xs" style={{ color: "var(--fg-subtle)" }}>{t.result.previewUnavailable}</p>
+          <div className="result-video-wrap">
+            <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-black/5">
+              <ImageIcon className="h-10 w-10" style={{ color: "var(--fg-subtle)", opacity: 0.4 }} />
+              <p className="text-xs" style={{ color: "var(--fg-subtle)" }}>{t.result.previewUnavailable}</p>
+            </div>
           </div>
         ) : (
-          // eslint-disable-next-line @next/next/no-img-element -- next/image cannot serve our dynamic backend /api/stream proxy URLs; plain img streams from our own backend exactly like <video> does
-          <img
-            key={firstMedia.url}
-            src={imgSrc ?? streamSrc}
-            alt={result.title ? decodeHtmlEntities(result.title).slice(0, 120) : t.typeBadges.photo}
-            className="media-frame w-full rounded-[20px] object-contain"
-            style={{ background: "#0a0a14" }}
-            onError={handleImgError}
-          />
+          <div className="result-video-wrap">
+            {/* eslint-disable-next-line @next/next/no-img-element -- next/image cannot serve our dynamic backend /api/stream proxy URLs; plain img streams from our own backend exactly like <video> does */}
+            <img
+              key={firstMedia.url}
+              src={imgSrc ?? streamSrc}
+              alt={result.title ? decodeHtmlEntities(result.title).slice(0, 120) : t.typeBadges.photo}
+              className="media-frame w-full rounded-[20px] object-contain"
+              style={{ background: "#0a0a14" }}
+              onError={handleImgError}
+            />
+          </div>
         )}
 
         {/* Footer */}
-        <div className="mt-3 flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-3 flex flex-col gap-2.5 px-1 sm:flex-row sm:items-center sm:justify-between">
           <span
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-fg-muted"
+            className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg px-2.5 py-1.5 text-xs font-medium text-fg-muted"
             style={{ background: "var(--bg)" }}
           >
             {isAudio ? (
@@ -668,7 +674,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
             onClick={isAudio ? handleDownloadAudio : handleDownloadVideo}
             disabled={(isAudio && !audioUrl) || downloading === "preparing" || (isAudio && audioLoading)}
             aria-label={isAudio ? t.result.downloadAudioLabel : t.result.downloadVideoLabel}
-            className="gradient-btn h-12 min-h-[48px] flex-1 text-[14px] sm:h-11 sm:min-h-[44px]"
+            className="gradient-btn result-download h-12 min-h-[48px] w-full flex-1 text-[14px] sm:h-11 sm:min-h-[44px] sm:w-auto"
           >
             {downloading === "preparing" ? (
               <>
@@ -698,7 +704,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
         )}
       </div>
 
-      <p className="mt-4 text-center text-[12.5px] text-fg-subtle">
+      <p className="mt-4 break-words px-2 text-center text-[12px] text-fg-subtle sm:text-[12.5px]">
         {t.result.tempNote}
       </p>
     </div>
@@ -877,50 +883,61 @@ export default function HeroDownloader() {
 
   const isAudioMode = activeTab === "audio";
 
+  const tabsRef = useRef<HTMLDivElement>(null);
+
+  // Keep the active tab fully visible inside the horizontal scroller.
+  useEffect(() => {
+    const el = tabsRef.current?.querySelector<HTMLElement>("[data-active='true']");
+    el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [activeTab]);
+
   return (
     <section
       id="hero"
-      className="relative overflow-hidden pb-12 pt-28 sm:pb-20 sm:pt-36 lg:pb-24"
+      className="hero-section relative overflow-hidden pb-8 pt-28 sm:pb-20 sm:pt-36 lg:pb-24"
     >
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute left-1/2 top-0 h-[700px] w-[1000px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-primary/[0.03] blur-[160px]" />
+      <div className="absolute inset-0 -z-10" aria-hidden="true">
+        <div className="absolute left-1/2 top-0 h-[420px] w-full max-w-[1000px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-primary/[0.03] blur-[160px] sm:h-[700px]" />
       </div>
 
-      <div className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-12">
-        <div className="mx-auto max-w-[680px] text-center">
+      <div className="mx-auto w-full max-w-[1200px] min-w-0 px-3 sm:px-6 lg:px-12">
+        <div className="mx-auto w-full min-w-0 max-w-[680px] text-center">
           <div
-            className="animate-fade-in-up mb-6 inline-flex items-center gap-2 rounded-full px-5 py-1.5 text-xs font-semibold tracking-wide text-fg-muted"
+            className="animate-fade-in-up mb-4 inline-flex max-w-full items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-semibold tracking-wide text-fg-muted sm:mb-6 sm:gap-2 sm:px-5 sm:text-xs"
             style={{ background: "var(--card)", boxShadow: "var(--shadow-card)", border: "1px solid var(--border)" }}
           >
-            <span className="inline-block h-2 w-2 rounded-full bg-accent" />
-            <Sparkles size={14} color="var(--accent)" strokeWidth={2} />
-            {t.hero.badge}
+            <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-accent" />
+            <Sparkles size={14} color="var(--accent)" strokeWidth={2} className="shrink-0" />
+            <span className="truncate">{t.hero.badge}</span>
           </div>
 
           <h1 className="animate-fade-in-up delay-100" style={{ lineHeight: 1.1 }}>
             <span
-              className="block"
+              className="hero-title-a block"
               style={{ fontFamily: "var(--font-sans)", fontWeight: 800, fontSize: "clamp(32px, 6vw, 68px)", color: "var(--fg)" }}
             >
               {t.hero.titleA}
             </span>
             <span
-              className="block"
+              className="hero-title-b block"
               style={{ fontFamily: "var(--font-accent)", fontWeight: 600, fontStyle: "italic", fontSize: "clamp(32px, 6vw, 68px)", background: "var(--brand-gradient-text)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}
             >
               {t.hero.titleB}
             </span>
           </h1>
 
-          <p className="animate-fade-in-up delay-200 mx-auto mt-5 max-w-xl text-[15px] sm:text-[18px] leading-[1.7] text-fg-muted">
+          <p className="hero-subtitle animate-fade-in-up delay-200 mx-auto mt-3 max-w-xl px-1 text-[15px] leading-[1.7] text-fg-muted sm:mt-5 sm:text-[18px]">
             {t.hero.subtitle}
           </p>
         </div>
 
         {/* Tab Bar */}
-        <div className="animate-fade-in-up delay-300 mx-auto mt-10 max-w-[720px]">
+        <div className="animate-fade-in-up delay-300 mx-auto mt-6 w-full min-w-0 max-w-[720px] sm:mt-10">
           <div
-            className="flex items-center gap-1.5 overflow-x-auto rounded-full px-1.5 py-1.5 scrollbar-hide"
+            ref={tabsRef}
+            role="tablist"
+            aria-label="Content types"
+            className="tabs-scroll flex items-center gap-1 overflow-x-auto rounded-full px-1.5 py-1.5 scrollbar-hide sm:gap-1.5"
             style={{ background: "var(--card)", boxShadow: "var(--shadow-card)", border: "1px solid var(--border)" }}
           >
             {TABS.map((tab) => {
@@ -930,16 +947,19 @@ export default function HeroDownloader() {
                 <button
                   key={tab.id}
                   type="button"
+                  role="tab"
+                  aria-selected={active}
+                  data-active={active}
                   onClick={() => setActiveTab(tab.id)}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2.5 text-[15px] font-semibold transition-all"
+                  className="inline-flex min-h-[44px] shrink-0 snap-center items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-semibold transition-all sm:px-4 sm:py-2.5 sm:text-[15px]"
                   style={{
                     background: active ? "var(--brand-gradient)" : "transparent",
                     color: active ? "#fff" : "var(--fg-muted)",
                     boxShadow: active ? "var(--shadow-brand)" : "none",
                   }}
                 >
-                  <Icon size={16} strokeWidth={2} />
-                  <span>{t.tabs[tab.id]}</span>
+                  <Icon size={15} strokeWidth={2} className="shrink-0" />
+                  <span className="whitespace-nowrap">{t.tabs[tab.id]}</span>
                 </button>
               );
             })}
@@ -947,10 +967,10 @@ export default function HeroDownloader() {
         </div>
 
         {/* Input Bar */}
-        <div className="animate-fade-in-up delay-300 mx-auto mt-6 max-w-[760px]">
-          <form onSubmit={handleSubmit} className="relative" noValidate>
+        <div className="animate-fade-in-up delay-300 mx-auto mt-4 w-full min-w-0 max-w-[760px] sm:mt-6">
+          <form onSubmit={handleSubmit} className="relative min-w-0" noValidate>
             <div
-              className="rounded-[20px] p-2.5 transition-shadow"
+              className="url-card rounded-[20px] p-2.5 transition-shadow"
               style={{
                 background: "var(--card)",
                 boxShadow: "var(--shadow-card), 0 0 40px rgba(124,77,245,0.06)",
@@ -1056,35 +1076,35 @@ export default function HeroDownloader() {
                     </button>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="url-actions flex min-w-0 gap-2">
                   <button
                     type="button"
                     onClick={handlePaste}
                     disabled={state === "PREPARING"}
-                    className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-xl border border-border text-[14px] font-medium text-fg-muted transition-colors hover:bg-primary-light hover:text-primary disabled:opacity-50"
+                    className="flex h-12 min-h-[48px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-border px-2 text-[14px] font-medium text-fg-muted transition-colors hover:bg-primary-light hover:text-primary disabled:opacity-50"
                     style={{ background: "var(--bg)" }}
                     aria-label={t.common.paste}
                   >
-                    <Clipboard className="h-4 w-4" />
-                    {t.common.paste}
+                    <Clipboard className="h-4 w-4 shrink-0" />
+                    <span className="btn-label truncate">{t.common.paste}</span>
                   </button>
                   <button
                     type="submit"
                     disabled={state === "PREPARING"}
-                    className="gradient-btn h-12 flex-1 text-[15px]"
+                    className="gradient-btn h-12 min-h-[48px] min-w-0 flex-1 px-2 text-[14px] sm:text-[15px]"
                   >
                     {state === "PREPARING" ? (
                       <>
-                        <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <svg className="h-5 w-5 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none">
                           <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
                       <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" className="opacity-75" />
                       </svg>
-                      {t.common.resolving}
+                      <span className="btn-label truncate">{t.common.resolving}</span>
                     </>
                   ) : (
                     <>
-                      <DownloadIcon className="h-5 w-5" />
-                      {t.common.getMedia}
+                      <DownloadIcon className="h-5 w-5 shrink-0" />
+                      <span className="btn-label truncate">{t.common.getMedia}</span>
                     </>
                   )}
                   </button>
@@ -1093,7 +1113,7 @@ export default function HeroDownloader() {
             </div>
           </form>
 
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[14px] text-fg-subtle">
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 px-1 text-[12.5px] text-fg-subtle sm:mt-4 sm:gap-x-5 sm:text-[14px]">
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-1 w-1 rounded-full bg-success" />
               {t.hero.foot1}
@@ -1125,16 +1145,16 @@ export default function HeroDownloader() {
           )}
 
           {state === "ERROR" && error && (
-            <div className="animate-fade-in-up mx-auto mt-10 max-w-[720px] px-4 sm:px-5">
+            <div className="animate-fade-in-up mx-auto mt-6 w-full max-w-[720px] sm:mt-10 sm:px-5">
               <div
-                className="rounded-[20px] p-6 text-center sm:p-8"
+                className="rounded-[20px] p-5 text-center sm:p-8"
                 style={{ border: "1px solid rgba(220,38,38,0.15)", background: "var(--danger-light)" }}
                 role="alert"
               >
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "rgba(220,38,38,0.1)" }}>
                   <AlertCircle className="h-6 w-6 text-danger" />
                 </div>
-                <p className="text-sm font-medium text-danger">{error}</p>
+                <p className="text-sm font-medium break-words text-danger">{error}</p>
                 <button
                   type="button"
                   onClick={handleRetry}

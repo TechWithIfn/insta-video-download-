@@ -84,7 +84,7 @@ export default function Header() {
   const isDark = theme === "dark";
 
   const iconBtn =
-    "flex h-11 min-w-[44px] items-center justify-center gap-1.5 rounded-xl px-2 text-[15px] font-medium text-fg-muted transition-colors hover:bg-primary-light hover:text-primary sm:h-auto sm:w-auto sm:hover:bg-transparent";
+    "site-icon-btn flex h-11 min-w-[44px] items-center justify-center gap-1.5 rounded-xl px-2 text-[15px] font-medium text-fg-muted transition-colors hover:bg-primary-light hover:text-primary sm:h-auto sm:w-auto sm:hover:bg-transparent";
 
   return (
     <>
@@ -95,20 +95,20 @@ export default function Header() {
             : "bg-transparent border-b border-transparent"
         }`}
       >
-        <div className="mx-auto flex h-[72px] max-w-[1200px] items-center justify-between px-4 sm:px-6 lg:px-12">
-          <Link href="/" className="flex items-center gap-2.5 text-fg no-underline" aria-label={t.footer.homeLabel}>
+        <div className="site-header-inner mx-auto flex h-[72px] max-w-[1200px] items-center justify-between gap-2 px-4 sm:px-6 lg:px-12">
+          <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2 text-fg no-underline sm:gap-2.5" aria-label={t.footer.homeLabel}>
             <span
-              className="flex h-[42px] w-[42px] items-center justify-center rounded-[12px] text-white"
+              className="site-logo-badge flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[12px] text-white"
               style={{ background: "var(--brand-gradient)", boxShadow: "0 4px 16px rgba(124,77,245,0.30)" }}
             >
               <Download className="h-5 w-5" strokeWidth={2.2} />
             </span>
-            <span className="text-[22px] font-bold tracking-[-0.01em]">
+            <span className="site-logo-text truncate text-[22px] font-bold tracking-[-0.01em]">
               Snap<span className="text-primary">Save</span>
             </span>
           </Link>
 
-          <div className="flex items-center gap-1 sm:gap-6">
+          <div className="flex min-w-0 shrink-0 items-center gap-0.5 sm:gap-6">
             <div className="relative" ref={langRef}>
               <button
                 type="button"
@@ -126,7 +126,7 @@ export default function Header() {
                 <div
                   role="menu"
                   aria-label={t.common.language}
-                  className="absolute right-0 top-full z-50 mt-2 max-h-[60vh] w-64 overflow-y-auto rounded-2xl p-1.5 animate-fade-in"
+                  className="absolute right-0 top-full z-50 mt-2 max-h-[60vh] w-[min(16rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl p-1.5 animate-fade-in"
                   style={{
                     background: "var(--card)",
                     border: "1px solid var(--border)",
@@ -201,7 +201,7 @@ export default function Header() {
 
             <button
               type="button"
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-fg-muted transition-colors hover:bg-primary-light hover:text-primary lg:hidden"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-fg-muted transition-colors hover:bg-primary-light hover:text-primary lg:hidden"
               onClick={() => setMobileOpen(true)}
               aria-label={t.header.openMenu}
               aria-expanded={mobileOpen}
@@ -220,7 +220,7 @@ export default function Header() {
         className={`fixed inset-y-0 right-0 z-50 w-full max-w-[380px] bg-bg-elevated shadow-[var(--shadow-xl)] transition-transform duration-300 ease-out lg:hidden ${mobileOpen ? "translate-x-0" : "translate-x-full"}`}
         role="dialog" aria-modal="true" aria-label={t.common.mobileNav}
       >
-        <div className="flex h-[72px] items-center justify-between border-b border-border px-5">
+        <div className="mobile-drawer-header flex h-[72px] items-center justify-between border-b border-border px-5">
           <span className="text-[15px] font-semibold text-fg">{t.common.menu}</span>
           <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl text-fg-muted transition-colors hover:bg-primary-light hover:text-primary" onClick={() => setMobileOpen(false)} aria-label={t.header.closeMenu}>
             <X className="h-5 w-5" />

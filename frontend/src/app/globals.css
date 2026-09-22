@@ -408,3 +408,236 @@ button:focus-visible {
     max-height: calc(100dvh - 360px);
   }
 }
+
+/* ─────────────────────────────────────────────
+   Mobile polish: 320px–430px phones (Android + iOS)
+   Desktop (sm+ / 640px+) is intentionally untouched.
+   ───────────────────────────────────────────── */
+
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: clip;
+}
+
+@supports not (overflow: clip) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+}
+
+body {
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
+  padding-left: var(--sal);
+  padding-right: var(--sar);
+}
+
+/* Prevent iOS auto-zoom + Android overflow from long URLs */
+input,
+textarea {
+  max-width: 100%;
+}
+
+/* Keep media from ever forcing horizontal scroll */
+img,
+video,
+svg {
+  max-width: 100%;
+}
+
+/* Tab bar: buttery horizontal scroll on touch, hidden scrollbar */
+.tabs-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+  scroll-padding-inline: 12px;
+  scrollbar-width: none;
+  mask-image: linear-gradient(to right, black 92%, transparent 100%);
+}
+.tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+.tabs-scroll > * {
+  scroll-snap-align: center;
+}
+
+/* Only phones */
+@media (max-width: 639.98px) {
+  /* Fluid, compact hero type — no fixed desktop sizes */
+  .hero-title-a,
+  .hero-title-b {
+    font-size: clamp(1.65rem, 8.4vw, 2.35rem) !important;
+    line-height: 1.12 !important;
+    letter-spacing: -0.01em;
+    overflow-wrap: break-word;
+    text-wrap: balance;
+  }
+
+  .hero-subtitle {
+    font-size: clamp(0.875rem, 3.9vw, 0.95rem) !important;
+    line-height: 1.6 !important;
+    text-wrap: pretty;
+  }
+
+  /* Compact header: everything fits one row at 320px */
+  .site-header-inner {
+    height: calc(60px + var(--sat)) !important;
+    padding-top: var(--sat);
+    padding-left: max(0.75rem, var(--sal)) !important;
+    padding-right: max(0.75rem, var(--sar)) !important;
+    gap: 0.5rem;
+  }
+  .site-logo-badge {
+    height: 34px !important;
+    width: 34px !important;
+    border-radius: 10px !important;
+  }
+  .site-logo-badge svg {
+    height: 1rem !important;
+    width: 1rem !important;
+  }
+  .site-logo-text {
+    font-size: 1.1rem !important;
+  }
+  .site-icon-btn {
+    min-width: 40px !important;
+    height: 40px !important;
+    padding-left: 0.4rem !important;
+    padding-right: 0.4rem !important;
+  }
+  .site-icon-btn svg {
+    height: 1.1rem !important;
+    width: 1.1rem !important;
+  }
+
+  /* Compact theme toggle on phones (desktop keeps 68px) */
+  .theme-toggle {
+    width: 52px !important;
+    height: 30px !important;
+  }
+  .theme-toggle__thumb {
+    width: 23px !important;
+    height: 23px !important;
+  }
+  [data-theme="dark"] .theme-toggle__thumb {
+    left: 25px !important;
+  }
+
+  /* Hero spacing: kill excessive empty space */
+  .hero-section {
+    padding-top: calc(76px + var(--sat)) !important;
+    padding-bottom: 2rem !important;
+  }
+
+  /* URL card fits viewport with balanced gutters */
+  .url-card {
+    padding: 0.5rem !important;
+    border-radius: 18px !important;
+  }
+  .url-card input {
+    font-size: 16px !important; /* stops iOS zoom-on-focus */
+    min-width: 0;
+  }
+  .url-actions {
+    min-width: 0;
+  }
+  .url-actions > * {
+    min-width: 0;
+    min-height: 48px;
+    white-space: nowrap;
+  }
+  .url-actions .btn-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* MediaResult: balanced margins, never oversized video */
+  .result-card {
+    width: 100% !important;
+    max-width: min(100%, 400px) !important;
+    margin-inline: auto;
+    padding: 0.75rem !important;
+    border-radius: 22px !important;
+  }
+  .result-top-row {
+    gap: 0.5rem;
+  }
+  .result-username {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .result-video-wrap {
+    width: 100%;
+    max-width: 300px;
+    margin-inline: auto;
+  }
+  .result-video-wrap .media-frame {
+    aspect-ratio: 9 / 16;
+    max-height: min(62dvh, 520px);
+    margin-inline: auto;
+  }
+  .result-download {
+    min-height: 48px !important;
+    width: 100%;
+  }
+
+  /* Footer respects iPhone home indicator */
+  footer {
+    padding-bottom: calc(3rem + var(--sab)) !important;
+  }
+}
+
+/* Ultra-narrow: 320px–359px — tighten even further */
+@media (max-width: 359.98px) {
+  .site-header-inner {
+    padding-left: max(0.6rem, var(--sal)) !important;
+    padding-right: max(0.6rem, var(--sar)) !important;
+  }
+  .site-logo-text {
+    font-size: 1rem !important;
+  }
+  .site-logo-badge {
+    height: 30px !important;
+    width: 30px !important;
+  }
+  .hero-title-a,
+  .hero-title-b {
+    font-size: clamp(1.5rem, 8.8vw, 2rem) !important;
+  }
+  .url-actions > * {
+    font-size: 13px !important;
+    padding-left: 0.6rem !important;
+    padding-right: 0.6rem !important;
+  }
+  .result-card {
+    padding: 0.625rem !important;
+  }
+  .result-video-wrap {
+    max-width: 262px;
+  }
+}
+
+/* Short landscape phones: keep 9:16 video reachable */
+@media (max-width: 639.98px) and (max-height: 500px) {
+  .result-video-wrap .media-frame {
+    max-height: 78dvh;
+  }
+}
+
+/* Notched iPhones: drawer + dropdown clear the sensor housing */
+@media (max-width: 639.98px) {
+  .mobile-drawer-header {
+    padding-top: max(0.75rem, var(--sat));
+  }
+}
