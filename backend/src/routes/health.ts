@@ -21,4 +21,19 @@ router.get("/media", async (_req: Request, res: Response) => {
   });
 });
 
+router.get("/ready", async (_req: Request, res: Response) => {
+  const providerName = process.env.RESOLVER_PROVIDER || "placeholder";
+  const ffmpegAvailable = await isFfmpegAvailable().catch(() => false);
+  res.json({
+    status: "ok",
+    provider: providerName,
+    providerConfigured: providerName !== "placeholder",
+    ffmpegAvailable,
+    node: process.version,
+    platform: process.platform,
+    serverless: Boolean(process.env.VERCEL),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 export default router;

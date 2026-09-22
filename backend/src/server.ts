@@ -1,57 +1,12 @@
 import "dotenv/config";
-import express from "express";
-import cors from "cors";
-import resolveRouter from "./routes/resolve.js";
-import downloadRouter from "./routes/download.js";
-import streamRouter from "./routes/stream.js";
-import audioRouter from "./routes/audio.js";
-import healthRouter from "./routes/health.js";
+import app from "./app.js";
 import { logger } from "./lib/logger.js";
 import { getProvider } from "./lib/providers/index.js";
 
-const app = express();
+// Local development / traditional hosting entry point.
+// On Vercel serverless, api/index.ts serves the exported app instead and
+// this listener never runs.
 const PORT = parseInt(process.env.PORT || "3001", 10);
-
-const corsOrigins = (process.env.CORS_ORIGIN || "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-
-app.use(cors({
-  origin: corsOrigins.length > 0 && !corsOrigins.includes("*")
-    ? corsOrigins
-    : true,
-  methods: ["GET", "POST"],
-  allowedHeaders: ["Content-Type"],
-}));
-
-app.use((_req, res, next) => {
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("X-XSS-Protection", "1; mode=block");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  next();
-});
-
-app.use(express.json({ limit: "1kb" }));
-
-app.use("/api/health", healthRouter);
-app.use("/api/resolve", resolveRouter);
-app.use("/api/download", downloadRouter);
-app.use("/api/stream", streamRouter);
-app.use("/api/audio", audioRouter);
-
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  logger.error("Unhandled error", { error: err.message });
-  res.status(500).json({
-    success: false,
-    error: {
-      code: "TEMPORARY_ERROR",
-      message: "An unexpected error occurred.",
-    },
-  });
-});
 
 const server = app.listen(PORT, () => {
   logger.info(`SnapSave backend running on port ${PORT}`);

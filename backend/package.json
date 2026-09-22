@@ -24,6 +24,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.2",
     "@types/node": "^22",
+    "@vercel/node": "^13.0.1",
     "tsx": "^4.19.0",
     "typescript": "^5",
     "vite": "^8.3.0",
