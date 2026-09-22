@@ -33,9 +33,9 @@ export const en: Strings = {
   },
   hero: {
     badge: "Fast · Free · No login required",
-    titleA: "Download Instagram",
-    titleB: "Media in Seconds",
-    subtitle: "Paste a public Instagram link and preview or save your media in seconds.",
+    titleA: "Downloadit – Instagram",
+    titleB: "Media Downloader",
+    subtitle: "Download public Instagram videos, Reels and photos with Downloadit. Paste a link, preview your media and save it to your device.",
     cardTitle: "Paste an Instagram Link",
     placeholder: "https://www.instagram.com/reel/...",
     audioPlaceholder: "https://www.instagram.com/reel/...",

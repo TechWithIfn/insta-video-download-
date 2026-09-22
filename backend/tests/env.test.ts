@@ -19,22 +19,22 @@ describe("readPositiveInt", () => {
   }
 
   it("falls back when missing", () => {
-    setEnv("SNAPSAVE_TEST_INT", undefined);
-    expect(readPositiveInt("SNAPSAVE_TEST_INT", 42)).toBe(42);
+    setEnv("DOWNLOADIT_TEST_INT", undefined);
+    expect(readPositiveInt("DOWNLOADIT_TEST_INT", 42)).toBe(42);
   });
 
   it("falls back on non-numeric, zero, or negative values", () => {
-    setEnv("SNAPSAVE_TEST_INT", "abc");
-    expect(readPositiveInt("SNAPSAVE_TEST_INT", 42)).toBe(42);
-    setEnv("SNAPSAVE_TEST_INT", "0");
-    expect(readPositiveInt("SNAPSAVE_TEST_INT", 42)).toBe(42);
-    setEnv("SNAPSAVE_TEST_INT", "-5");
-    expect(readPositiveInt("SNAPSAVE_TEST_INT", 42)).toBe(42);
+    setEnv("DOWNLOADIT_TEST_INT", "abc");
+    expect(readPositiveInt("DOWNLOADIT_TEST_INT", 42)).toBe(42);
+    setEnv("DOWNLOADIT_TEST_INT", "0");
+    expect(readPositiveInt("DOWNLOADIT_TEST_INT", 42)).toBe(42);
+    setEnv("DOWNLOADIT_TEST_INT", "-5");
+    expect(readPositiveInt("DOWNLOADIT_TEST_INT", 42)).toBe(42);
   });
 
   it("reads valid values", () => {
-    setEnv("SNAPSAVE_TEST_INT", "7");
-    expect(readPositiveInt("SNAPSAVE_TEST_INT", 42)).toBe(7);
+    setEnv("DOWNLOADIT_TEST_INT", "7");
+    expect(readPositiveInt("DOWNLOADIT_TEST_INT", 42)).toBe(7);
   });
 
   it("rate limiting honors RATE_LIMIT_MAX_REQUESTS", () => {

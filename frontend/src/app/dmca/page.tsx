@@ -4,6 +4,7 @@ import LegalPage from "@/components/LegalPage";
 export const metadata: Metadata = {
   title: "DMCA / Copyright — Downloadit",
   description: "Downloadit copyright and DMCA information.",
+  alternates: { canonical: "/dmca" },
 };
 
 export default function DmcaPage() {

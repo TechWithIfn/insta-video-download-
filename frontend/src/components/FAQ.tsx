@@ -13,7 +13,22 @@ export default function FAQ() {
   }, []);
 
   return (
-    <section id="faq" className="px-4 py-20 sm:px-6 sm:py-28 lg:px-8" aria-label={t.faq.title}>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: t.faq.items.map((item) => ({
+              "@type": "Question",
+              name: item.q,
+              acceptedAnswer: { "@type": "Answer", text: item.a },
+            })),
+          }),
+        }}
+      />
+      <section id="faq" className="px-4 py-20 sm:px-6 sm:py-28 lg:px-8" aria-label={t.faq.title}>
       <div className="mx-auto max-w-[720px]">
         <div className="mb-14 text-center">
           <p
@@ -76,6 +91,7 @@ export default function FAQ() {
           })}
         </div>
       </div>
-    </section>
+      </section>
+    </>
   );
 }

@@ -120,6 +120,7 @@ export class ExternalProvider extends BaseProvider {
           height: typeof item.height === "number" ? item.height : null,
           duration:
             typeof item.duration === "number" ? item.duration : null,
+          size: typeof item.size === "number" ? item.size : null,
           thumbnail:
             typeof item.thumbnail === "string" && this.validateMediaUrl(item.thumbnail)
               ? item.thumbnail

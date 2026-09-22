@@ -77,9 +77,25 @@ function getContentTypeLabel(type: string, badges: Strings["typeBadges"]): strin
 
 function formatTime(seconds: number): string {
   if (!isFinite(seconds) || seconds < 0) return "0:00";
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
+  const totalSeconds = Math.floor(seconds);
+  const hours = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  if (hours > 0) return `${hours}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "Original";
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unit = units[0];
+  for (let index = 1; value >= 1024 && index < units.length; index++) {
+    value /= 1024;
+    unit = units[index];
+  }
+  return `${value.toFixed(value >= 10 ? 0 : 1)} ${unit}`;
 }
 
 function sanitizeHandle(username: string | null | undefined): string {
@@ -96,7 +112,7 @@ const TABS = [
   { id: "audio", icon: Music },
 ] as const;
 
-type TabId = (typeof TABS)[number]["id"];
+export type DownloaderTab = (typeof TABS)[number]["id"];
 
 // ─── Circular progress (REAL backend stages only) ────────────
 // The value shown here comes exclusively from `progress` SSE events sent
@@ -157,7 +173,7 @@ function CircularProgress({ value, label }: { value: number; label: string }) {
 
 // ─── Video Player ─────────────────────────────────────────
 
-function VideoPlayer({ src, poster, mediaType }: { src: string; poster?: string; mediaType?: string }) {
+function VideoPlayer({ src, poster, mediaType, onDurationChange }: { src: string; poster?: string; mediaType?: string; onDurationChange?: (duration: number) => void }) {
   const { t } = useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
@@ -174,7 +190,11 @@ function VideoPlayer({ src, poster, mediaType }: { src: string; poster?: string;
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onTime = () => setCurrent(v.currentTime);
-    const onMeta = () => setDuration(v.duration);
+    const onMeta = () => {
+      const nextDuration = Number.isFinite(v.duration) && v.duration >= 0 ? v.duration : 0;
+      setDuration(nextDuration);
+      onDurationChange?.(nextDuration);
+    };
     const onEnd = () => { setPlaying(false); setCurrent(0); };
     const onError = () => {
       if (process.env.NODE_ENV === "development") {
@@ -209,7 +229,7 @@ function VideoPlayer({ src, poster, mediaType }: { src: string; poster?: string;
       v.removeEventListener("ended", onEnd);
       v.removeEventListener("error", onError);
     };
-  }, [currentSrc, mediaType]);
+  }, [currentSrc, mediaType, onDurationChange]);
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
@@ -253,20 +273,17 @@ function VideoPlayer({ src, poster, mediaType }: { src: string; poster?: string;
           className="absolute inset-0 h-full w-full object-contain"
         />
 
-        {/* Play / Pause button */}
-        <button
-          type="button"
-          onClick={togglePlay}
-          className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full backdrop-blur-md transition-transform hover:scale-105 active:scale-95 sm:h-16 sm:w-16"
-          style={{ background: "rgba(255,255,255,0.18)", border: "1.5px solid rgba(255,255,255,0.25)" }}
-          aria-label={playing ? t.result.pauseVideo : t.result.playVideo}
-        >
-          {playing ? (
-            <Pause className="h-6 w-6 text-white" fill="white" strokeWidth={0} />
-          ) : (
+        {!playing && (
+          <button
+            type="button"
+            onClick={togglePlay}
+            className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full backdrop-blur-md transition-transform hover:scale-105 active:scale-95 sm:h-16 sm:w-16"
+            style={{ background: "rgba(255,255,255,0.18)", border: "1.5px solid rgba(255,255,255,0.25)" }}
+            aria-label={t.result.playVideo}
+          >
             <Play className="ml-1 h-6 w-6 text-white" fill="white" strokeWidth={0} />
-          )}
-        </button>
+          </button>
+        )}
       </div>
 
       {/* Progress bar */}
@@ -556,7 +573,10 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
 
   // Derived metadata for the new two-column card
   const resolution = firstMedia?.width && firstMedia?.height ? `${firstMedia.width} × ${firstMedia.height}` : firstMedia?.type === "video" ? "1080 × 1920" : "—";
-  const durationLabel = firstMedia?.duration ? formatTime(firstMedia.duration) : "—";
+  const [loadedDuration, setLoadedDuration] = useState(0);
+  const apiDuration = firstMedia?.duration;
+  const resolvedDuration = typeof apiDuration === "number" && Number.isFinite(apiDuration) && apiDuration > 0 ? apiDuration : loadedDuration;
+  const durationLabel = resolvedDuration > 0 ? formatTime(resolvedDuration) : "—";
   const previewRef = useRef<HTMLDivElement>(null);
   const handlePreview = useCallback(() => {
     const v = previewRef.current?.querySelector<HTMLVideoElement>("video");
@@ -579,13 +599,13 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   const qualityLabel = "HD";
 
   return (
-    <div className="animate-fade-in-up mx-auto mt-6 w-[calc(100%-32px)] max-w-[720px] sm:mt-10 sm:w-full sm:max-w-[760px] sm:px-5">
+    <div className="result-card animate-fade-in-up mx-auto mt-6 w-[calc(100%-32px)] max-w-[900px] sm:mt-10 sm:w-full sm:px-5">
       <div
         className="overflow-hidden rounded-[28px] p-3 sm:p-4 md:p-5"
         style={{ background: "var(--card)", boxShadow: "0 20px 60px rgba(60,40,120,0.12)", border: "1px solid var(--border)" }}
       >
         {/* Card header: badge + handle + New */}
-        <div className="mb-3 flex items-center justify-between gap-2 px-1">
+        <div className="result-top-row mb-3 flex items-center justify-between gap-2 px-1">
           <span
             className="inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-bold text-white"
             style={{ background: isAudio ? "linear-gradient(135deg, #7c4df5, #ec5fa8)" : "var(--brand-gradient)" }}
@@ -615,9 +635,9 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
         )}
 
         {/* ── Two-column body: LEFT preview / RIGHT info ── */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
+        <div className="result-grid grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,0.9fr)_minmax(280px,1.1fr)] md:gap-6">
           {/* LEFT: large preview */}
-          <div ref={previewRef} className="min-w-0">
+          <div ref={previewRef} className="result-video-wrap min-w-0">
             {isAudio ? (
               <>
                 {audioLoading && (
@@ -646,6 +666,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
                 src={streamSrc}
                 poster={firstMedia.thumbnail || undefined}
                 mediaType={firstMedia.type}
+                onDurationChange={setLoadedDuration}
               />
             ) : imgFailed ? (
               <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-black/5">
@@ -668,8 +689,8 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
           </div>
 
           {/* RIGHT: information + actions */}
-          <div className="flex min-w-0 flex-col gap-3 md:gap-4">
-            <div className="rounded-[18px] p-4" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+          <div className="result-details flex min-w-0 flex-col gap-3 md:gap-4">
+            <div className="result-info rounded-[18px] p-4" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
               <div className="flex items-center gap-2">
                 <span
                   className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-white"
@@ -685,18 +706,18 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                <div className="rounded-xl bg-card px-2.5 py-2.5 text-center sm:px-3" style={{ border: "1px solid var(--border)" }}>
+              <div className="result-stats mt-4 grid gap-2">
+                <div className="result-stat rounded-xl bg-card px-3 py-2.5" style={{ border: "1px solid var(--border)" }}>
                   <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-fg-subtle">Resolution</p>
-                  <p className="mt-1 truncate text-[13px] font-bold text-fg">{resolution}</p>
+                  <p className="mt-1 break-words text-[clamp(0.8rem,1.5vw,0.875rem)] font-bold text-fg">{resolution}</p>
                 </div>
-                <div className="rounded-xl bg-card px-2.5 py-2.5 text-center sm:px-3" style={{ border: "1px solid var(--border)" }}>
+                <div className="result-stat rounded-xl bg-card px-3 py-2.5" style={{ border: "1px solid var(--border)" }}>
                   <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-fg-subtle">Size</p>
-                  <p className="mt-1 text-[13px] font-bold text-fg">Original</p>
+                  <p className="mt-1 break-words text-[clamp(0.8rem,1.5vw,0.875rem)] font-bold text-fg">{firstMedia?.size != null ? formatBytes(firstMedia.size) : "Original"}</p>
                 </div>
-                <div className="rounded-xl bg-card px-2.5 py-2.5 text-center sm:px-3" style={{ border: "1px solid var(--border)" }}>
+                <div className="result-stat rounded-xl bg-card px-3 py-2.5" style={{ border: "1px solid var(--border)" }}>
                   <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-fg-subtle">Duration</p>
-                  <p className="mt-1 text-[13px] font-bold text-fg">{durationLabel}</p>
+                  <p className="mt-1 break-words text-[clamp(0.8rem,1.5vw,0.875rem)] font-bold text-fg">{durationLabel}</p>
                 </div>
               </div>
 
@@ -706,7 +727,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
               </div>
             </div>
 
-            <div className="mt-auto flex flex-col gap-2.5 sm:flex-row">
+            <div className="result-actions flex flex-col gap-2.5 sm:flex-row">
               <button
                 type="button"
                 onClick={handlePreview}
@@ -760,7 +781,12 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
 
 // ─── Main Component ───────────────────────────────────────
 
-export default function HeroDownloader() {
+interface HeroDownloaderProps {
+  activeTab: DownloaderTab;
+  onActiveTabChange: (tab: DownloaderTab) => void;
+}
+
+export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDownloaderProps) {
   const { t } = useLanguage();
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
@@ -768,7 +794,6 @@ export default function HeroDownloader() {
   const [result, setResult] = useState<ResolveData | null>(null);
   // Default to the primary mode (Reels). The tab is ONLY ever changed by an
   // explicit user click — resolve results, validation and errors never touch it.
-  const [activeTab, setActiveTab] = useState<TabId>("reels");
   // Real processing progress: updated exclusively from backend SSE stage
   // events. Never advanced by timers.
   const [progress, setProgress] = useState(0);
@@ -1012,7 +1037,7 @@ export default function HeroDownloader() {
                   role="tab"
                   aria-selected={active}
                   data-active={active}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => onActiveTabChange(tab.id)}
                   className="inline-flex min-h-[44px] shrink-0 snap-center items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-semibold transition-all sm:px-4 sm:py-2.5 sm:text-[15px]"
                   style={{
                     background: active ? "var(--brand-gradient)" : "transparent",
@@ -1039,10 +1064,6 @@ export default function HeroDownloader() {
                 border: "1px solid var(--border)",
               }}
             >
-              <h2 className="flex items-center gap-2 px-1 pb-2.5 text-[15px] font-bold text-fg sm:px-1 sm:text-[16px]">
-                <LinkIcon className="h-4 w-4 shrink-0 text-primary" strokeWidth={2} aria-hidden="true" />
-                {t.hero.cardTitle}
-              </h2>
               {/* Desktop: horizontal */}
               <div className="hidden sm:flex sm:flex-row sm:gap-2">
                 <div className="relative min-w-0 flex-1">

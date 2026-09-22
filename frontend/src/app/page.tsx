@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Header from "@/components/Header";
-import HeroDownloader from "@/components/HeroDownloader";
+import HeroDownloader, { type DownloaderTab } from "@/components/HeroDownloader";
 import Features from "@/components/Features";
 import HowItWorks from "@/components/HowItWorks";
 import FAQ from "@/components/FAQ";
@@ -14,12 +15,25 @@ const QUICK_ICONS = [Zap, ShieldCheck, Clock, Smartphone];
 
 export default function Home() {
   const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<DownloaderTab>("reels");
+
+  useEffect(() => {
+    const requestedTab = new URLSearchParams(window.location.search).get("tab");
+    if (requestedTab === "reels" || requestedTab === "videos" || requestedTab === "photos" || requestedTab === "audio") {
+      queueMicrotask(() => setActiveTab(requestedTab));
+    }
+  }, []);
+
+  const handleDownloaderTabChange = (tab: DownloaderTab) => {
+    setActiveTab(tab);
+    document.getElementById("hero")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <>
-      <Header />
+      <Header activeDownloaderTab={activeTab} onDownloaderTabChange={handleDownloaderTabChange} />
       <main className="flex-1">
-        <HeroDownloader />
+        <HeroDownloader activeTab={activeTab} onActiveTabChange={setActiveTab} />
 
         {/* ── Quick Feature Strip ── */}
         <ScrollReveal>

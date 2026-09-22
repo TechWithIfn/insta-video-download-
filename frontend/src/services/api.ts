@@ -8,6 +8,7 @@ export interface MediaItem {
   width: number | null;
   height: number | null;
   duration: number | null;
+  size?: number | null;
   thumbnail: string | null;
   format: string | null;
 }

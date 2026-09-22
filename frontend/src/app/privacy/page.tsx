@@ -4,6 +4,7 @@ import LegalPage from "@/components/LegalPage";
 export const metadata: Metadata = {
   title: "Privacy Policy — Downloadit",
   description: "Downloadit privacy policy.",
+  alternates: { canonical: "/privacy" },
 };
 
 export default function PrivacyPage() {

@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Poppins, Lora } from "next/font/google";
+import Script from "next/script";
 import { LanguageProvider } from "@/i18n";
+import { BRAND_DESCRIPTION, BRAND_NAME, BRAND_TITLE, SITE_URL } from "@/config/site";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -17,22 +19,33 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
-  title: "Downloadit — Save Instagram Content",
-  description:
-    "Save public Instagram posts, reels, videos, photos, stories and highlights from a simple link. No login required.",
+  metadataBase: new URL(SITE_URL),
+  title: BRAND_TITLE,
+  description: BRAND_DESCRIPTION,
   openGraph: {
-    title: "Downloadit — Save Instagram Content",
-    description:
-      "Save public Instagram posts, reels, videos, photos, stories and highlights from a simple link.",
+    title: BRAND_TITLE,
+    description: BRAND_DESCRIPTION,
     type: "website",
-    siteName: "Downloadit",
+    siteName: BRAND_NAME,
+    url: `${SITE_URL}/`,
+    images: [{ url: "/og-downloadit.png", width: 1200, height: 630, alt: "Downloadit Instagram media downloader" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Downloadit — Save Instagram Content",
-    description:
-      "Save public Instagram posts, reels, videos, photos, stories and highlights from a simple link.",
+    title: BRAND_TITLE,
+    description: BRAND_DESCRIPTION,
+    images: ["/og-downloadit.png"],
   },
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-48x48.png", sizes: "48x48", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/manifest.webmanifest",
   robots: {
     index: true,
     follow: true,
@@ -62,7 +75,23 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <script
+        <link rel="canonical" href={`${SITE_URL}/`} />
+        <Script
+          id="website-structured-data"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: BRAND_NAME,
+              alternateName: ["Downloadit.pro", "Downloadit Instagram Downloader"],
+              url: `${SITE_URL}/`,
+            }),
+          }}
+        />
+        <Script
+          id="downloadit-theme-init"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               (function(){

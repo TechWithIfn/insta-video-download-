@@ -449,6 +449,124 @@ body {
   }
 }
 
+/* Media result: keep the preview and details balanced without allowing
+   metadata or controls to create overflow at narrow widths. */
+.result-card {
+  width: min(calc(100% - 32px), 900px);
+  padding: clamp(12px, 2vw, 20px);
+}
+
+.result-grid {
+  align-items: stretch;
+}
+
+.result-video-wrap {
+  min-width: 0;
+  width: 100%;
+}
+
+.result-video-wrap .media-frame {
+  width: min(100%, 380px);
+  max-height: none;
+  margin-inline: auto;
+  aspect-ratio: 9 / 16;
+}
+
+.result-video-wrap video {
+  object-fit: contain;
+}
+
+.result-details,
+.result-info,
+.result-actions {
+  min-width: 0;
+}
+
+.result-stats {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.result-stat {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.75fr) minmax(0, 1.25fr);
+  align-items: baseline;
+  gap: 12px;
+}
+
+.result-stat > :last-child {
+  min-width: 0;
+  text-align: right;
+}
+
+.result-actions > * {
+  min-height: 48px;
+  flex: 1 1 0%;
+}
+
+.mobile-nav-icon {
+  display: inline-flex;
+  height: 34px;
+  width: 34px;
+  flex: 0 0 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+}
+
+.mobile-drawer {
+  padding-top: var(--sat);
+  border-left: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.mobile-drawer-header {
+  min-height: 68px;
+}
+
+.mobile-drawer-nav {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+[data-theme="dark"] .mobile-drawer {
+  background: #151321;
+  border-left-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] .mobile-drawer .text-fg {
+  color: #f4f3fa;
+}
+
+[data-theme="dark"] .mobile-drawer .text-fg-subtle {
+  color: #aaa7bd;
+}
+
+[data-theme="dark"] .mobile-drawer .border-border,
+[data-theme="dark"] .mobile-drawer .border-border-light {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 767.98px) {
+  .result-card {
+    width: calc(100% - 32px);
+    padding: clamp(12px, 4vw, 16px);
+  }
+
+  .result-video-wrap .media-frame {
+    width: min(100%, 320px);
+  }
+
+  .result-details {
+    gap: 16px;
+  }
+}
+
+@media (min-width: 768px) {
+  .result-video-wrap .media-frame {
+    width: 100%;
+  }
+}
+
 body {
   text-rendering: optimizeLegibility;
   -webkit-tap-highlight-color: transparent;

@@ -4,6 +4,7 @@ import LegalPage from "@/components/LegalPage";
 export const metadata: Metadata = {
   title: "Terms of Service — Downloadit",
   description: "Downloadit terms of service.",
+  alternates: { canonical: "/terms" },
 };
 
 export default function TermsPage() {

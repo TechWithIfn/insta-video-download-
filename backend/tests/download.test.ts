@@ -10,7 +10,7 @@ describe("Download query-param validation", () => {
       .replace(/^-+|-+$/g, "")
       .replace(/^\.+|\.+$/g, "")
       .replace(/\.[a-z0-9]{2,4}$/, "");
-    if (!base) base = "snapsave-media";
+    if (!base) base = "downloadit-media";
     const ct = contentType.toLowerCase();
     let ext = ".mp4";
     if (ct.includes("image/png")) ext = ".png";
@@ -32,9 +32,9 @@ describe("Download query-param validation", () => {
   });
 
   it("falls back to a safe name for empty input", () => {
-    expect(sanitizeDownloadFilename("", "video/mp4")).toBe("snapsave-media.mp4");
-    expect(sanitizeDownloadFilename(undefined, "video/mp4")).toBe("snapsave-media.mp4");
-    expect(sanitizeDownloadFilename("...", "video/mp4")).toBe("snapsave-media.mp4");
+    expect(sanitizeDownloadFilename("", "video/mp4")).toBe("downloadit-media.mp4");
+    expect(sanitizeDownloadFilename(undefined, "video/mp4")).toBe("downloadit-media.mp4");
+    expect(sanitizeDownloadFilename("...", "video/mp4")).toBe("downloadit-media.mp4");
   });
 
   it("truncates long names", () => {

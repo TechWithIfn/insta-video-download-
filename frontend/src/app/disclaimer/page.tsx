@@ -4,6 +4,7 @@ import LegalPage from "@/components/LegalPage";
 export const metadata: Metadata = {
   title: "Disclaimer — Downloadit",
   description: "Downloadit disclaimer.",
+  alternates: { canonical: "/disclaimer" },
 };
 
 export default function DisclaimerPage() {
