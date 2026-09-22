@@ -586,12 +586,12 @@ svg {
   }
   .result-video-wrap {
     width: 100%;
-    max-width: 300px;
+    max-width: 280px;
     margin-inline: auto;
   }
   .result-video-wrap .media-frame {
     aspect-ratio: 9 / 16;
-    max-height: min(62dvh, 520px);
+    max-height: min(56dvh, 480px);
     margin-inline: auto;
   }
   .result-download {
@@ -650,7 +650,17 @@ svg {
     padding: 0.625rem !important;
   }
   .result-video-wrap {
-    max-width: 262px;
+    max-width: 248px;
+  }
+  /* Tabs: keep Reels / Videos / Photos in one view at 320px */
+  .tabs-scroll {
+    gap: 2px !important;
+  }
+  .tabs-scroll > button {
+    padding-left: 0.625rem !important;
+    padding-right: 0.625rem !important;
+    font-size: 12px !important;
+    min-height: 40px !important;
   }
 }
 

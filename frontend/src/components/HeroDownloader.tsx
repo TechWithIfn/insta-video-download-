@@ -1091,12 +1091,12 @@ export default function HeroDownloader() {
                     </button>
                   )}
                 </div>
-                <div className="url-actions flex min-w-0 gap-2">
+                <div className="url-actions flex min-w-0 flex-col gap-2">
                   <button
                     type="button"
                     onClick={handlePaste}
                     disabled={state === "PREPARING"}
-                    className="flex h-12 min-h-[48px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-border px-2 text-[14px] font-medium text-fg-muted transition-colors hover:bg-primary-light hover:text-primary disabled:opacity-50"
+                    className="flex h-12 min-h-[48px] w-full min-w-0 items-center justify-center gap-1.5 rounded-xl border border-border px-3 text-[14px] font-medium text-fg-muted transition-colors hover:bg-primary-light hover:text-primary disabled:opacity-50"
                     style={{ background: "var(--bg)" }}
                     aria-label={t.common.paste}
                   >
@@ -1106,7 +1106,7 @@ export default function HeroDownloader() {
                   <button
                     type="submit"
                     disabled={state === "PREPARING"}
-                    className="gradient-btn h-12 min-h-[48px] min-w-0 flex-1 px-2 text-[14px] sm:text-[15px]"
+                    className="gradient-btn h-12 min-h-[48px] w-full min-w-0 px-3 text-[15px]"
                   >
                     {state === "PREPARING" ? (
                       <>
