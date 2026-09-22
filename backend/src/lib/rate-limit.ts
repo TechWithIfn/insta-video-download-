@@ -1,4 +1,5 @@
 import type { RateLimitConfig } from "./types.js";
+import { readPositiveInt } from "./env.js";
 
 interface RateLimitEntry {
   count: number;
@@ -7,14 +8,16 @@ interface RateLimitEntry {
 
 const store = new Map<string, RateLimitEntry>();
 
-const DEFAULT_CONFIG: RateLimitConfig = {
-  windowMs: 60_000,
-  maxRequests: 30,
-};
+function defaultRateLimitConfig(): RateLimitConfig {
+  return {
+    windowMs: readPositiveInt("RATE_LIMIT_WINDOW_MS", 60_000),
+    maxRequests: readPositiveInt("RATE_LIMIT_MAX_REQUESTS", 30),
+  };
+}
 
 export function checkRateLimit(
   key: string,
-  config: RateLimitConfig = DEFAULT_CONFIG
+  config: RateLimitConfig = defaultRateLimitConfig()
 ): { allowed: boolean; remaining: number; retryAfterMs: number } {
   const now = Date.now();
   const entry = store.get(key);

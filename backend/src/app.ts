@@ -6,6 +6,7 @@ import streamRouter from "./routes/stream.js";
 import audioRouter from "./routes/audio.js";
 import healthRouter from "./routes/health.js";
 import { logger } from "./lib/logger.js";
+import { readPositiveInt } from "./lib/env.js";
 
 const app = express();
 
@@ -31,7 +32,7 @@ app.use((_req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: "1kb" }));
+app.use(express.json({ limit: readPositiveInt("MAX_REQUEST_BODY_SIZE", 1024) }));
 
 // Lightweight service info. No resolver work here.
 app.get("/", (_req, res) => {

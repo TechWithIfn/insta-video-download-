@@ -33,6 +33,9 @@ export function isServerlessRuntime(): boolean {
 const NAVIGATION_TIMEOUT_MS = 15_000;
 const DATA_WAIT_TIMEOUT_MS = 5_000;
 const MAX_CONCURRENT_PAGES = 3;
+// Slots held longer than this are presumed leaked and reclaimed on next
+// acquire. Legitimate resolves finish an order of magnitude sooner.
+const PAGE_SLOT_STALE_MS = 120_000;
 const MOBILE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -431,7 +434,10 @@ export class PuppeteerProvider extends BaseProvider {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private browser: any = null;
   private launching: Promise<void> | null = null;
-  private activePages = 0;
+  // Acquisition timestamps of held page slots (single source of truth for
+  // concurrency). Timestamps let us reclaim slots leaked by killed/frozen
+  // runtimes (e.g. a serverless instance frozen mid-resolve).
+  private pageSlots: number[] = [];
   private pageWaiters: Array<() => void> = [];
 
   private async ensureBrowser(): Promise<void> {
@@ -509,10 +515,19 @@ export class PuppeteerProvider extends BaseProvider {
     logger.info("Puppeteer serverless browser launched (@sparticuz/chromium)");
   }
 
+  /** Drop slots held far longer than any legitimate resolve (leak recovery). */
+  private reclaimStalePageSlots(): void {
+    const cutoff = Date.now() - PAGE_SLOT_STALE_MS;
+    while (this.pageSlots.length > 0 && this.pageSlots[0] < cutoff) {
+      this.pageSlots.shift();
+    }
+  }
+
   /** Bounded page concurrency: fail fast instead of spawning unlimited pages. */
   private async acquirePageSlot(): Promise<boolean> {
-    if (this.activePages < MAX_CONCURRENT_PAGES) {
-      this.activePages++;
+    this.reclaimStalePageSlots();
+    if (this.pageSlots.length < MAX_CONCURRENT_PAGES) {
+      this.pageSlots.push(Date.now());
       return true;
     }
     const waited = await new Promise<boolean>((resolve) => {
@@ -522,12 +537,15 @@ export class PuppeteerProvider extends BaseProvider {
         resolve(true);
       });
     });
-    if (waited) this.activePages++;
-    return waited;
+    if (!waited) return false;
+    this.reclaimStalePageSlots();
+    if (this.pageSlots.length >= MAX_CONCURRENT_PAGES) return false;
+    this.pageSlots.push(Date.now());
+    return true;
   }
 
   private releasePageSlot(): void {
-    this.activePages = Math.max(0, this.activePages - 1);
+    this.pageSlots.shift();
     const next = this.pageWaiters.shift();
     if (next) next();
   }
@@ -992,6 +1010,10 @@ export class PuppeteerProvider extends BaseProvider {
       });
       throw createError("PROVIDER_UNAVAILABLE");
     } finally {
+      if (slotHeld) {
+        slotHeld = false;
+        this.releasePageSlot();
+      }
       if (page) {
         await page.close().catch(() => {});
       }

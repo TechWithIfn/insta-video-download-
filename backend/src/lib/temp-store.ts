@@ -1,8 +1,9 @@
 import type { MediaItem, TempStoreEntry, InstagramContentType } from "./types.js";
+import { readPositiveInt } from "./env.js";
 
 const store = new Map<string, TempStoreEntry>();
 
-const TTL_MS = 10 * 60 * 1000;
+const TTL_MS = readPositiveInt("TEMP_STORE_TTL_MS", 10 * 60 * 1000);
 const MAX_ENTRIES = 1000;
 
 export function storeMedia(
