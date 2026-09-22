@@ -33,12 +33,12 @@ export const en: Strings = {
   },
   hero: {
     badge: "Fast · Free · No login required",
-    titleA: "Save the Instagram content",
-    titleB: "you care about",
-    subtitle:
-      "Paste a public link to any Instagram post, reel, or video. Preview it and save the original media to your device in seconds — in stunning quality.",
-    placeholder: "Paste an Instagram link here...",
-    audioPlaceholder: "Paste a reel/video link to extract audio...",
+    titleA: "Download Instagram",
+    titleB: "Media in Seconds",
+    subtitle: "Paste a public Instagram link and preview or save your media in seconds.",
+    cardTitle: "Paste an Instagram Link",
+    placeholder: "https://www.instagram.com/reel/...",
+    audioPlaceholder: "https://www.instagram.com/reel/...",
     inputLabel: "Instagram URL input",
     foot1: "No account required",
     foot2: "Public content only",
@@ -173,28 +173,32 @@ export const en: Strings = {
     subtitle: "Quick answers to what people usually ask.",
     items: [
       {
-        q: "What types of Instagram links can I use?",
-        a: "You can paste links to public posts, reels, videos, carousels, stories, and highlights.",
+        q: "Does SnapSave require login?",
+        a: "No. SnapSave works with public links only — no account, login, or password needed.",
       },
       {
-        q: "Do I need an Instagram account to use this?",
-        a: "No. SnapSave works without any sign-up or login.",
+        q: "Which Instagram links are supported?",
+        a: "Public posts, reels, videos, photos, carousels, stories, and highlights. Private content is never supported.",
       },
       {
-        q: "Does it work on mobile?",
-        a: "Yes. The site is fully responsive and works in any modern mobile browser.",
+        q: "Where are downloaded files saved?",
+        a: "Files are saved to your device's default downloads folder — just like any browser download.",
       },
       {
-        q: "Can I download carousel posts?",
-        a: "Yes. Every slide in a carousel is available to save individually.",
+        q: "Is the media stored on SnapSave?",
+        a: "No. Media is streamed directly and not permanently stored. Temporary links expire quickly, so download while available.",
       },
       {
-        q: "Can I download from private profiles?",
-        a: "No. Only publicly available content can be fetched.",
+        q: "Why can a media link expire?",
+        a: "Instagram CDN links are temporary and signed. After a short time they expire — just resolve the original URL again for a fresh link.",
       },
       {
-        q: "Why might a link fail to work?",
-        a: "The post may be private or deleted, the link may be incomplete, or the media may be temporarily unavailable. Check the link and try again.",
+        q: "Why might a download fail?",
+        a: "The post may be private or deleted, the link expired, the network dropped, or the content type isn't supported. Check the link and try again.",
+      },
+      {
+        q: "How does Audio mode work?",
+        a: "Select the Audio tab, paste a public video link, and SnapSave extracts the audio as an MP3 using server-side processing.",
       },
     ],
   },

@@ -60,6 +60,7 @@ export interface Strings {
     titleA: string;
     titleB: string;
     subtitle: string;
+    cardTitle: string;
     placeholder: string;
     audioPlaceholder: string;
     inputLabel: string;
@@ -118,7 +119,7 @@ export interface Strings {
     eyebrow: string;
     title: string;
     subtitle: string;
-    items: [QuestionAnswer, QuestionAnswer, QuestionAnswer, QuestionAnswer, QuestionAnswer, QuestionAnswer];
+    items: QuestionAnswer[];
   };
   result: {
     audio: string;

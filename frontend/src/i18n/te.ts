@@ -35,6 +35,7 @@ export const te: Strings = {
     badge: "వేగం · ఉచితం · లాగిన్ అవసరం లేదు",
     titleA: "Instagram కంటెంట్ సేవ్ చేయండి",
     titleB: "మీకు నచ్చినది",
+    cardTitle: "Paste an Instagram Link",
     subtitle:
       "ఏదైనా Instagram పోస్ట్, రీల్ లేదా వీడియో పబ్లిక్ లింక్ పేస్ట్ చేయండి. ప్రివ్యూ చూసి అసలు మీడియాను సెకన్లలో మీ డివైజ్‌లో సేవ్ చేయండి — అద్భుతమైన క్వాలిటీలో.",
     placeholder: "ఇక్కడ Instagram లింక్ పేస్ట్ చేయండి...",

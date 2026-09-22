@@ -35,6 +35,7 @@ export const kn: Strings = {
     badge: "ವೇಗ · ಉಚಿತ · ಲಾಗಿನ್ ಇಲ್ಲ",
     titleA: "Instagram ವಿಷಯವನ್ನು ಉಳಿಸಿ",
     titleB: "ನಿಮಗೆ ಇಷ್ಟವಾದದ್ದು",
+    cardTitle: "Paste an Instagram Link",
     subtitle:
       "ಯಾವುದೇ Instagram ಪೋಸ್ಟ್, ರೀಲ್ ಅಥವಾ ವೀಡಿಯೊದ ಸಾರ್ವಜನಿಕ ಲಿಂಕ್ ಅಂಟಿಸಿ. ಮುನ್ನೋಟ ನೋಡಿ ಮತ್ತು ಮೂಲ ಮೀಡಿಯಾವನ್ನು ಸೆಕೆಂಡುಗಳಲ್ಲಿ ನಿಮ್ಮ ಸಾಧನದಲ್ಲಿ ಉಳಿಸಿ — ಅತ್ಯುತ್ತಮ ಗುಣಮಟ್ಟದಲ್ಲಿ.",
     placeholder: "ಇಲ್ಲಿ Instagram ಲಿಂಕ್ ಅಂಟಿಸಿ...",

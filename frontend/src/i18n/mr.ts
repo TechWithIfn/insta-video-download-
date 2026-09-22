@@ -35,6 +35,7 @@ export const mr: Strings = {
     badge: "जलद · मोफत · लॉगिन नको",
     titleA: "Instagram कंटेंट जतन करा",
     titleB: "जे तुम्हाला आवडते",
+    cardTitle: "Paste an Instagram Link",
     subtitle:
       "कोणत्याही Instagram पोस्ट, रील किंवा व्हिडिओची सार्वजनिक लिंक पेस्ट करा. त्याचे पूर्वावलोकन पहा आणि मूळ मीडिया सेकंदांत तुमच्या डिव्हाइसवर जतन करा — उत्तम गुणवत्तेत.",
     placeholder: "इथे Instagram लिंक पेस्ट करा...",

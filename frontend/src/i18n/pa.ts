@@ -35,6 +35,7 @@ export const pa: Strings = {
     badge: "ਤੇਜ਼ · ਮੁਫ਼ਤ · ਲਾਗਇਨ ਤੋਂ ਬਿਨਾਂ",
     titleA: "Instagram ਸਮੱਗਰੀ ਸਾਂਭੋ",
     titleB: "ਜੋ ਤੁਹਾਨੂੰ ਪਸੰਦ ਹੈ",
+    cardTitle: "Paste an Instagram Link",
     subtitle:
       "ਕਿਸੇ ਵੀ Instagram ਪੋਸਟ, ਰੀਲ ਜਾਂ ਵੀਡੀਓ ਦਾ ਜਨਤਕ ਲਿੰਕ ਪੇਸਟ ਕਰੋ। ਝਲਕ ਵੇਖੋ ਅਤੇ ਅਸਲ ਮੀਡੀਆ ਸਕਿੰਟਾਂ ਵਿੱਚ ਆਪਣੇ ਡਿਵਾਈਸ 'ਤੇ ਸਾਂਭੋ — ਸ਼ਾਨਦਾਰ ਕੁਆਲਿਟੀ ਵਿੱਚ।",
     placeholder: "ਇੱਥੇ Instagram ਲਿੰਕ ਪੇਸਟ ਕਰੋ...",

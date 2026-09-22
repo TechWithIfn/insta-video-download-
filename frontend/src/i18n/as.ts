@@ -35,6 +35,7 @@ export const as: Strings = {
     badge: "দ্ৰুত · বিনামূলীয়া · লগইন নাই",
     titleA: "Instagram কন্টেন্ট সংৰক্ষণ কৰক",
     titleB: "যি আপুনি ভাল পায়",
+    cardTitle: "Paste an Instagram Link",
     subtitle:
       "যিকোনো Instagram প’ষ্ট, ৰিল বা ভিডিঅ’ৰ ৰাজহুৱা লিংক পেষ্ট কৰক। প্ৰিভিউ চাওক আৰু মূল মিডিয়া ছেকেণ্ডতে আপোনাৰ ডিভাইচত সংৰক্ষণ কৰক — উন্নত কোৱালিটিত।",
     placeholder: "ইয়াত Instagram লিংক পেষ্ট কৰক...",

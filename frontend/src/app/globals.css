@@ -145,6 +145,9 @@
 }
 
 html {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   scroll-behavior: smooth;
   scroll-padding-top: 80px;
 }
@@ -164,6 +167,10 @@ html {
 }
 
 body {
+  width: 100%;
+  max-width: 100%;
+  min-width: 320px;
+  margin: 0;
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-sans);
@@ -399,9 +406,17 @@ button:focus-visible {
   display: none;
 }
 
-/* Clamp tall 9:16 media frames on short viewports so the video keeps its
-   aspect ratio (object-contain letterboxes) while controls stay reachable
-   without excessive scrolling. Wide/tall screens are unaffected. */
+/* Spec-compliant video caps: 70vh mobile / 560px desktop, object-contain
+   keeps media letterboxed (never cropped). Short viewports clamp further. */
+.media-frame {
+  max-height: 560px;
+}
+@media (max-width: 639.98px) {
+  .media-frame {
+    max-height: 70vh;
+    max-height: 70dvh;
+  }
+}
 @media (max-height: 780px) {
   .media-frame {
     max-height: calc(100vh - 360px);
@@ -439,6 +454,13 @@ body {
   -webkit-tap-highlight-color: transparent;
   padding-left: var(--sal);
   padding-right: var(--sar);
+}
+
+/* Important mobile containers respect safe-area with 16px floor (spec 3) */
+.hero-section,
+.site-header-inner {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
 }
 
 /* Prevent iOS auto-zoom + Android overflow from long URLs */

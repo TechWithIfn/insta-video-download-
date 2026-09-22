@@ -35,6 +35,7 @@ export const bn: Strings = {
     badge: "দ্রুত · ফ্রি · লগইন ছাড়াই",
     titleA: "Instagram কন্টেন্ট সংরক্ষণ করুন",
     titleB: "যা আপনার পছন্দ",
+    cardTitle: "Paste an Instagram Link",
     subtitle:
       "যেকোনো Instagram পোস্ট, রিল বা ভিডিওর পাবলিক লিংক পেস্ট করুন। প্রিভিউ দেখুন এবং আসল মিডিয়া সেকেন্ডের মধ্যে আপনার ডিভাইসে সংরক্ষণ করুন — চমৎকার কোয়ালিটিতে।",
     placeholder: "এখানে Instagram লিংক পেস্ট করুন...",

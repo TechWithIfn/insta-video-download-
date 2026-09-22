@@ -992,6 +992,10 @@ export default function HeroDownloader() {
                 border: "1px solid var(--border)",
               }}
             >
+              <h2 className="flex items-center gap-2 px-1 pb-2.5 text-[15px] font-bold text-fg sm:px-1 sm:text-[16px]">
+                <LinkIcon className="h-4 w-4 shrink-0 text-primary" strokeWidth={2} aria-hidden="true" />
+                {t.hero.cardTitle}
+              </h2>
               {/* Desktop: horizontal */}
               <div className="hidden sm:flex sm:flex-row sm:gap-2">
                 <div className="relative min-w-0 flex-1">

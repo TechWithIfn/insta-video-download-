@@ -35,6 +35,7 @@ export const gu: Strings = {
     badge: "ઝડપી · મફત · લોગિન વિના",
     titleA: "Instagram કન્ટેન્ટ સાચવો",
     titleB: "જે તમને ગમે છે",
+    cardTitle: "Paste an Instagram Link",
     subtitle:
       "કોઈપણ Instagram પોસ્ટ, રીલ કે વિડિઓની જાહેર લિંક પેસ્ટ કરો. તેનું પ્રિવ્યૂ જુઓ અને મૂળ મીડિયા સેકંડોમાં તમારા ડિવાઇસમાં સાચવો — શાનદાર ક્વોલિટીમાં.",
     placeholder: "અહીં Instagram લિંક પેસ્ટ કરો...",

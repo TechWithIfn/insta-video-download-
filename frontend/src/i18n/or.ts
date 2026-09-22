@@ -35,6 +35,7 @@ export const or: Strings = {
     badge: "ଦ୍ରୁତ · ମାଗଣା · ଲଗଇନ ବିନା",
     titleA: "Instagram ବିଷୟ ସଂରକ୍ଷଣ କରନ୍ତୁ",
     titleB: "ଯାହା ଆପଣଙ୍କୁ ପସନ୍ଦ",
+    cardTitle: "Paste an Instagram Link",
     subtitle:
       "ଯେକୌଣସି Instagram ପୋଷ୍ଟ, ରିଲ ବା ଭିଡିଓର ସାର୍ବଜନୀନ ଲିଙ୍କ ପେଷ୍ଟ କରନ୍ତୁ। ପ୍ରିଭ୍ୟୁ ଦେଖନ୍ତୁ ଏବଂ ମୂଳ ମିଡିଆ ସେକେଣ୍ଡ ମଧ୍ୟରେ ଆପଣଙ୍କ ଡିଭାଇସରେ ସଂରକ୍ଷଣ କରନ୍ତୁ — ଉତ୍କୃଷ୍ଟ ଗୁଣବତ୍ତାରେ।",
     placeholder: "ଏଠାରେ Instagram ଲିଙ୍କ ପେଷ୍ଟ କରନ୍ତୁ...",
