@@ -615,6 +615,34 @@ function isTrustedCdnUrl(raw: string): boolean {
   }
 }
 
+async function isVerifiedVideoUrl(raw: string): Promise<boolean> {
+  if (!isTrustedCdnUrl(raw)) return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(unescapeInstagramString(raw));
+  } catch {
+    return false;
+  }
+
+  if (/\.mp4(?:$|[?#])/i.test(parsed.pathname + parsed.search)) return true;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5_000);
+  try {
+    const response = await fetch(parsed, {
+      method: "HEAD",
+      headers: { "User-Agent": MOBILE_UA, Accept: "video/*,*/*;q=0.5" },
+      redirect: "manual",
+      signal: controller.signal,
+    });
+    return response.ok && (response.headers.get("content-type") || "").toLowerCase().startsWith("video/");
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Plain-HTTP page fetch shared by metadata extraction and the dedicated
  * audio-page resolver. Returns raw HTML, or null on any failure.
@@ -977,11 +1005,14 @@ export class PuppeteerProvider extends BaseProvider {
   }
 
   /** Fast path: plain-HTML metadata already yielded a direct video URL. */
-  private buildResultFromVideo(
+  private async buildResultFromVideo(
     url: string,
     videoUrl: string,
     meta: { ogImage: string | null; title: string | null; description: string | null; author: Author | null }
-  ): ResolverResult {
+  ): Promise<ResolverResult> {
+    if (!(await isVerifiedVideoUrl(videoUrl))) {
+      throw createError("VIDEO_SOURCE_NOT_FOUND");
+    }
     const contentType = this.detectContentType(url);
     const author = meta.author || extractAuthorFromUrl(url);
     const decodedAuthor: Author | null = author
@@ -1074,7 +1105,7 @@ export class PuppeteerProvider extends BaseProvider {
               fetchMeta.ogImage || (storyCandidate.type === "image" ? storyCandidate.url : null),
           };
           return storyCandidate.type === "video"
-            ? this.buildResultFromVideo(url, storyCandidate.url, storyMeta)
+            ? await this.buildResultFromVideo(url, storyCandidate.url, storyMeta)
             : this.buildResultFromMetadata(url, storyMeta);
         }
       }
@@ -1089,7 +1120,7 @@ export class PuppeteerProvider extends BaseProvider {
         url.includes("/tv/") ||
         url.includes("/reels/audio/");
       if (isVideoPage && fetchMeta.ogVideo && !fetchMeta.loginWall) {
-        const result = this.buildResultFromVideo(url, fetchMeta.ogVideo, fetchMeta);
+        const result = await this.buildResultFromVideo(url, fetchMeta.ogVideo, fetchMeta);
         timings.totalMs = Date.now() - startTime;
         logger.info("[resolve] fast path complete", { ...timings, mediaCount: 1 });
         return result;
@@ -1625,7 +1656,10 @@ export class PuppeteerProvider extends BaseProvider {
         videoCandidates: allMedia.filter((m) => m.type === "video").length,
       });
 
-      // Validate and filter
+      const contentType = this.detectContentType(url);
+
+      // Validate and filter. Reel/video pages must never degrade to a poster
+      // or profile image when no playable video was exposed.
       const validMedia: MediaItem[] = [];
       for (const item of allMedia) {
         if (this.validateMediaUrl(item.url)) {
@@ -1646,7 +1680,16 @@ export class PuppeteerProvider extends BaseProvider {
         }
       }
 
-      if (validMedia.length === 0) {
+      const playableMedia =
+        contentType === "REEL" || contentType === "VIDEO"
+          ? (await Promise.all(
+              validMedia
+                .filter((item) => item.type === "video")
+                .map(async (item) => (await isVerifiedVideoUrl(item.url)) ? item : null)
+            )).filter((item): item is MediaItem => item !== null)
+          : validMedia;
+
+      if (playableMedia.length === 0) {
         logger.error("Puppeteer NO_MEDIA_FOUND", {
           url,
           interceptedCount: interceptedMedia.length,
@@ -1708,8 +1751,6 @@ export class PuppeteerProvider extends BaseProvider {
         throw createError("CONTENT_UNAVAILABLE");
       }
 
-      const contentType = this.detectContentType(url);
-
       // An audio page whose media is only cover art (no playable video) must
       // never masquerade as a result: look for a linked clip first, then fail
       // honestly so the audio route never reports a confusing "no video".
@@ -1722,7 +1763,7 @@ export class PuppeteerProvider extends BaseProvider {
         throw createError("AUDIO_NO_SOURCE");
       }
 
-      const orderedMedia = sortVideoFirst(validMedia, contentType);
+      const orderedMedia = sortVideoFirst(playableMedia, contentType);
 
       const author =
         fetchMeta.author ||

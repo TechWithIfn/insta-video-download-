@@ -298,6 +298,7 @@ function VideoPlayer({ src, poster, mediaType, width, height, onDurationChange, 
           ref={videoRef}
           src={currentSrc}
           poster={poster || undefined}
+          controls
           playsInline
           preload="metadata"
           className="absolute inset-0 h-full w-full object-contain"
