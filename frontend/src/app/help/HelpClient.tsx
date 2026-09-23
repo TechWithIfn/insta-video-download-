@@ -18,7 +18,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ScrollReveal from "@/components/ScrollReveal";
 import { useLanguage } from "@/i18n";
-import { SUPPORT_MAILTO } from "@/config/site";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/config/site";
 
 const TYPE_ICONS = [Play, Film, ImageIcon, Clock, Star, Music];
 
@@ -271,6 +271,14 @@ export default function HelpClient() {
                 <Mail className="h-5 w-5" />
                 {h.supportBtn}
               </a>
+              <p className="mt-4 text-[14.5px] text-fg-muted">
+                <a
+                  href={SUPPORT_MAILTO}
+                  className="inline-flex min-h-[44px] items-center justify-center break-all font-medium transition-colors hover:text-primary"
+                >
+                  {SUPPORT_EMAIL}
+                </a>
+              </p>
             </section>
           </ScrollReveal>
         </div>

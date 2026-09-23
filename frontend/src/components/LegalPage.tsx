@@ -30,7 +30,7 @@ export default function LegalPage({
         Questions about this page? Contact us at{" "}
         <a
           href={SUPPORT_MAILTO}
-          className="inline-flex min-h-[44px] items-center font-semibold text-fg transition-colors hover:text-primary"
+          className="inline-flex min-h-[44px] items-center break-all font-semibold text-fg transition-colors hover:text-primary"
         >
           {SUPPORT_EMAIL}
         </a>

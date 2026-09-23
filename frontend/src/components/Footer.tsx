@@ -88,7 +88,7 @@ export default function Footer() {
               <p className="text-[13px] font-bold uppercase tracking-[0.1em] text-fg">{t.footer.email}</p>
               <a
                 href={SUPPORT_MAILTO}
-                className="mt-1 inline-flex min-h-[44px] items-center gap-2 text-[14.5px] font-medium text-fg-muted transition-colors hover:text-primary"
+                className="mt-1 inline-flex min-h-[44px] items-center gap-2 break-all text-[14.5px] font-medium text-fg-muted transition-colors hover:text-primary"
               >
                 <Mail className="h-4 w-4 shrink-0" strokeWidth={2} />
                 {SUPPORT_EMAIL}
