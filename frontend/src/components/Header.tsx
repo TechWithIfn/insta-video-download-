@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Globe, HelpCircle, Sun, Moon, Download, Menu, X, Check, Home as HomeIcon, Film, Video, Image as ImageIcon, Music2, Star, Lightbulb, CircleHelp, Shield, FileText } from "lucide-react";
+import { Globe, HelpCircle, Sun, Moon, Download, Menu, X, Check, Home as HomeIcon, Film, Video, Image as ImageIcon, Music2, Star, Lightbulb, CircleHelp, Shield, FileText, Mail } from "lucide-react";
 import { useLanguage, LANGUAGES } from "@/i18n";
+import { SUPPORT_GMAIL_URL } from "@/config/site";
 import type { DownloaderTab } from "@/components/HeroDownloader";
 
 function getInitialTheme(): "light" | "dark" {
@@ -298,6 +299,10 @@ export default function Header({ activeDownloaderTab, onDownloaderTabChange }: H
             <span className="mobile-nav-icon bg-sky-500/10 text-sky-500"><CircleHelp className="h-[18px] w-[18px]" /></span>
             <span>Help</span>
           </Link>
+          <a href={SUPPORT_GMAIL_URL} target="_blank" rel="noopener noreferrer" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
+            <span className="mobile-nav-icon bg-rose-500/10 text-rose-500"><Mail className="h-[18px] w-[18px]" /></span>
+            <span>{t.common.emailSupport}</span>
+          </a>
           <Link href="/privacy" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
             <span className="mobile-nav-icon bg-teal-500/10 text-teal-500"><Shield className="h-[18px] w-[18px]" /></span>
             <span>Privacy</span>
