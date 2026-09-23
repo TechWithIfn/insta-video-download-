@@ -322,19 +322,26 @@ function VideoPlayer({ src, poster, mediaType, width, height, onDurationChange, 
           playsInline
           preload="metadata"
           className="absolute inset-0 h-full w-full object-contain"
+          onClick={togglePlay}
         />
 
-        {!playing && (
-          <button
-            type="button"
-            onClick={togglePlay}
-            className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full backdrop-blur-md transition-transform hover:scale-105 active:scale-95 sm:h-16 sm:w-16"
-            style={{ background: "rgba(255,255,255,0.18)", border: "1.5px solid rgba(255,255,255,0.25)" }}
-            aria-label={t.result.playVideo}
-          >
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            togglePlay();
+          }}
+          className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full backdrop-blur-md transition-transform hover:scale-105 active:scale-95 sm:h-16 sm:w-16"
+          style={{ background: "rgba(255,255,255,0.18)", border: "1.5px solid rgba(255,255,255,0.25)" }}
+          aria-label={playing ? "Pause video" : t.result.playVideo}
+          aria-pressed={playing}
+        >
+          {playing ? (
+            <Pause className="h-6 w-6 text-white" fill="white" strokeWidth={0} />
+          ) : (
             <Play className="ml-1 h-6 w-6 text-white" fill="white" strokeWidth={0} />
-          </button>
-        )}
+          )}
+        </button>
       </div>
 
       {/* Progress bar + time + mute */}
