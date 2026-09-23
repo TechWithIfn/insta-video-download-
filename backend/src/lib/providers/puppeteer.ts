@@ -1250,16 +1250,8 @@ export class PuppeteerProvider extends BaseProvider {
           if (type === "media" || type === "image" || type === "video") {
             interceptedMediaRequestCount++;
           }
-          let isTrustedImage = false;
-          if (type === "image") {
-            try {
-              isTrustedImage = isCdnMediaHost(new URL(target).hostname);
-            } catch {
-              isTrustedImage = false;
-            }
-          }
           if (
-            (type === "image" && !isTrustedImage) ||
+            (type === "image" && !isStory) ||
             type === "font" ||
             type === "stylesheet" ||
             /googletagmanager|google-analytics|facebook\.net\/tr|connect\.facebook/i.test(target)
@@ -1358,7 +1350,7 @@ export class PuppeteerProvider extends BaseProvider {
             const looksLikeMedia =
               resourceType === "media" ||
               ctLower.startsWith("video/") ||
-              (ctLower.startsWith("image/") && isTrustedCdnUrl(resUrl) && !isLikelyStaticInstagramAssetUrl(resUrl)) ||
+              (isStory && ctLower.startsWith("image/") && isTrustedCdnUrl(resUrl) && !isLikelyStaticInstagramAssetUrl(resUrl)) ||
               (ctLower.includes("octet-stream") && /fbcdn|cdninstagram|scontent/i.test(resUrl));
             if (looksLikeMedia) {
               let host: string | null = null;
@@ -1373,7 +1365,11 @@ export class PuppeteerProvider extends BaseProvider {
                 status: statusCode,
                 contentType: resContentType.slice(0, 80),
               });
-              if (isTrustedCdnUrl(resUrl) && !interceptedMedia.some((m) => m.url === resUrl)) {
+              if (
+                isTrustedCdnUrl(resUrl) &&
+                (resourceType === "media" || ctLower.startsWith("video/") || isStory) &&
+                !interceptedMedia.some((m) => m.url === resUrl)
+              ) {
                 capturedCdnMediaUrlCount++;
                 interceptedMedia.push({
                   url: resUrl,
@@ -1414,7 +1410,7 @@ export class PuppeteerProvider extends BaseProvider {
       const waitStart = Date.now();
       await page
         .waitForFunction(
-          `!!document.querySelector('video[src], img[src], article, meta[property="og:video"]')`,
+          `!!document.querySelector('${isStory ? "video[src], img[src]," : "video[src],"} article, meta[property="og:video"]')`,
           { timeout: DATA_WAIT_TIMEOUT_MS }
         )
         .catch(() => {});
