@@ -533,6 +533,8 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   const [audioError, setAudioError] = useState<string | null>(null);
   // Carousel / highlight navigation: one item visible at a time.
   const [currentIndex, setCurrentIndex] = useState(0);
+  // Long captions are clamped with a Show more/less toggle.
+  const [captionExpanded, setCaptionExpanded] = useState(false);
   // Real duration/resolution observed from the <video> element (never faked).
   const [realDuration, setRealDuration] = useState<number | null>(null);
   const [realResolution, setRealResolution] = useState<{ w: number; h: number } | null>(null);
@@ -552,7 +554,11 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   const safeIndex = items.length === 0 ? 0 : Math.min(currentIndex, items.length - 1);
   const currentMedia = items[safeIndex] ?? null;
   const isAudio = mode === "audio";
-  const showCarouselNav = !isAudio && items.length > 1;
+  // Carousel controls ONLY for real carousel posts. Reels, single videos,
+  // single photos, stories, highlights and audio never show a counter/arrows —
+  // even if the backend returned more than one media item for them.
+  const isCarouselPost = !isAudio && (result.type === "CAROUSEL" || (result.type === "POST" && items.length > 1));
+  const showCarouselNav = isCarouselPost && items.length > 1;
 
   const resetPerItemState = useCallback(() => {
     setImgSrc(null);
@@ -724,11 +730,27 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
           </button>
         </div>
 
-        {result.title && (
-          <p className="result-title px-1 pb-3 text-[13px] leading-[1.5] text-fg-muted break-words">
-            {decodeHtmlEntities(result.title)}
-          </p>
-        )}
+        {result.title && (() => {
+          const caption = decodeHtmlEntities(result.title);
+          const isLong = caption.length > 160;
+          return (
+            <div className="result-title px-1 pb-3">
+              <p className={`text-[13px] leading-[1.5] text-fg-muted break-words ${!captionExpanded && isLong ? "line-clamp-3" : ""}`}>
+                {caption}
+              </p>
+              {isLong && (
+                <button
+                  type="button"
+                  onClick={() => setCaptionExpanded((v) => !v)}
+                  className="mt-1 min-h-[32px] text-[12.5px] font-semibold text-primary transition-colors hover:text-primary-hover"
+                  aria-expanded={captionExpanded}
+                >
+                  {captionExpanded ? "Show less" : "Show more"}
+                </button>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ── Two-column body: LEFT preview / RIGHT info ── */}
         <div className="result-grid grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,1fr)] lg:gap-6">
@@ -866,10 +888,12 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
                 <dt className="font-medium text-fg-subtle">File Size</dt>
                 <dd className="mt-0.5 font-semibold tabular-nums text-fg">{isAudio ? "MP3 · 192k" : formatBytes(currentMedia?.size)}</dd>
               </div>
-              <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
-                <dt className="font-medium text-fg-subtle">Duration</dt>
-                <dd className="mt-0.5 font-semibold tabular-nums text-fg">{isAudio ? "Audio · MP3" : (currentMedia?.type === "video" ? formatMetaDuration(currentMedia?.duration, realDuration) : "—")}</dd>
-              </div>
+              {(isAudio || currentMedia?.type === "video") && (
+                <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                  <dt className="font-medium text-fg-subtle">Duration</dt>
+                  <dd className="mt-0.5 font-semibold tabular-nums text-fg">{isAudio ? "Audio · MP3" : formatMetaDuration(currentMedia?.duration, realDuration)}</dd>
+                </div>
+              )}
               <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
                 <dt className="font-medium text-fg-subtle">Format</dt>
                 <dd className="mt-0.5 font-semibold text-fg">{isAudio ? "MP3" : (currentMedia ? labelForMedia(currentMedia) : "—")}</dd>
@@ -984,6 +1008,10 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
       // Single active request: supersede anything still in flight so rapid
       // clicks can never spawn parallel resolutions.
       invalidateRequest();
+      // If the user explicitly chose the Audio tab before submitting, keep it:
+      // auto-detection must not flip Audio mode back to Reels/Photos, or the
+      // MP3 extraction flow would never run.
+      const submittedInAudioMode = activeTab === "audio";
       const seq = ++requestSeqRef.current;
       setResult(null);
       setError("");
@@ -1015,8 +1043,10 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
           closeStream();
           setProgress(100);
           setProgressStage("");
-          const detectedTab = resolveTabFromResultType(data.type);
-          if (detectedTab) onActiveTabChange(detectedTab);
+          if (!submittedInAudioMode) {
+            const detectedTab = resolveTabFromResultType(data.type);
+            if (detectedTab) onActiveTabChange(detectedTab);
+          }
           setResult(data);
           setState("SUCCESS");
         },
@@ -1042,8 +1072,10 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                 setState("ERROR");
                 return;
               }
-              const detectedTab = resolveTabFromResultType(data.data.type);
-              if (detectedTab) onActiveTabChange(detectedTab);
+              if (!submittedInAudioMode) {
+                const detectedTab = resolveTabFromResultType(data.data.type);
+                if (detectedTab) onActiveTabChange(detectedTab);
+              }
               setProgress(100);
               setProgressStage("");
               setResult(data.data);
@@ -1061,7 +1093,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
       });
       streamRef.current = handle;
     },
-    [url, t, invalidateRequest, clearWatchdog, closeStream, onActiveTabChange]
+    [url, t, activeTab, invalidateRequest, clearWatchdog, closeStream, onActiveTabChange]
   );
 
   const isAudioMode = activeTab === "audio";
