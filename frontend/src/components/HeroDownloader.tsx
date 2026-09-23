@@ -302,7 +302,6 @@ function VideoPlayer({ src, poster, mediaType, width, height, onDurationChange, 
           playsInline
           preload="metadata"
           className="absolute inset-0 h-full w-full object-contain"
-          onClick={togglePlay}
         />
 
         {!playing && (
