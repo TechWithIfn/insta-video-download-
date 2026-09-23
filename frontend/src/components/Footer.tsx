@@ -2,7 +2,7 @@
 
 import { Download, Mail } from "lucide-react";
 import Link from "next/link";
-import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/config/site";
+import { SUPPORT_EMAIL, SUPPORT_GMAIL_URL } from "@/config/site";
 import { useLanguage } from "@/i18n";
 
 function LinkColumn({ title, links }: { title: string; links: { label: string; href: string }[] }) {
@@ -87,7 +87,9 @@ export default function Footer() {
             <div className="mt-5">
               <p className="text-[13px] font-bold uppercase tracking-[0.1em] text-fg">{t.footer.email}</p>
               <a
-                href={SUPPORT_MAILTO}
+                href={SUPPORT_GMAIL_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="mt-1 inline-flex min-h-[44px] items-center gap-2 break-all text-[14.5px] font-medium text-fg-muted transition-colors hover:text-primary"
               >
                 <Mail className="h-4 w-4 shrink-0" strokeWidth={2} />

@@ -18,7 +18,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ScrollReveal from "@/components/ScrollReveal";
 import { useLanguage } from "@/i18n";
-import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/config/site";
+import { SUPPORT_EMAIL, SUPPORT_GMAIL_URL } from "@/config/site";
 
 const TYPE_ICONS = [Play, Film, ImageIcon, Clock, Star, Music];
 
@@ -267,13 +267,15 @@ export default function HelpClient() {
               <p className="mx-auto mt-3 max-w-[420px] text-[15px] leading-[1.7] text-fg-muted">
                 {h.supportDesc}
               </p>
-              <a href={SUPPORT_MAILTO} className="gradient-btn mt-6 min-h-[48px] px-8 text-[15px]">
+              <a href={SUPPORT_GMAIL_URL} target="_blank" rel="noopener noreferrer" className="gradient-btn mt-6 min-h-[48px] px-8 text-[15px]">
                 <Mail className="h-5 w-5" />
                 {h.supportBtn}
               </a>
               <p className="mt-4 text-[14.5px] text-fg-muted">
                 <a
-                  href={SUPPORT_MAILTO}
+                  href={SUPPORT_GMAIL_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex min-h-[44px] items-center justify-center break-all font-medium transition-colors hover:text-primary"
                 >
                   {SUPPORT_EMAIL}

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { SUPPORT_MAILTO, SUPPORT_EMAIL } from "@/config/site";
+import { SUPPORT_GMAIL_URL, SUPPORT_EMAIL } from "@/config/site";
 
 export default function LegalPage({
   title,
@@ -29,7 +29,9 @@ export default function LegalPage({
       <p className="mt-8 text-[15px] text-fg-muted">
         Questions about this page? Contact us at{" "}
         <a
-          href={SUPPORT_MAILTO}
+          href={SUPPORT_GMAIL_URL}
+          target="_blank"
+          rel="noopener noreferrer"
           className="inline-flex min-h-[44px] items-center break-all font-semibold text-fg transition-colors hover:text-primary"
         >
           {SUPPORT_EMAIL}
