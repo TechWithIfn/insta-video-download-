@@ -17,6 +17,8 @@ import {
   Music,
   ChevronLeft,
   ChevronRight,
+  Maximize,
+  Minimize,
 } from "lucide-react";
 import {
   resolveInstagramUrl,
@@ -194,11 +196,13 @@ function aspectRatioStyle(width?: number | null, height?: number | null, fallbac
 function VideoPlayer({ src, poster, mediaType, width, height, onDurationChange, onResolution }: { src: string; poster?: string; mediaType?: string; width?: number | null; height?: number | null; onDurationChange?: (duration: number) => void; onResolution?: (w: number, h: number) => void }) {
   const { t } = useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [mediaError, setMediaError] = useState(false);
   const retryCountRef = useRef(0);
   const [currentSrc, setCurrentSrc] = useState(src);
@@ -254,6 +258,14 @@ function VideoPlayer({ src, poster, mediaType, width, height, onDurationChange, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSrc, mediaType]);
 
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setFullscreen(document.fullscreenElement === playerRef.current);
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
@@ -282,6 +294,15 @@ function VideoPlayer({ src, poster, mediaType, width, height, onDurationChange, 
     setMuted(v.muted);
   }, []);
 
+  const toggleFullscreen = useCallback(() => {
+    if (!playerRef.current) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      playerRef.current.requestFullscreen?.().catch(() => {});
+    }
+  }, []);
+
   if (mediaError) {
     return (
       <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-black/5">
@@ -292,13 +313,12 @@ function VideoPlayer({ src, poster, mediaType, width, height, onDurationChange, 
   }
 
   return (
-    <div className="relative overflow-hidden rounded-[20px]" style={{ background: "#0a0a14" }}>
+    <div ref={playerRef} className="relative overflow-hidden rounded-[20px]" style={{ background: "#0a0a14" }}>
       <div className="relative w-full media-frame" style={aspectRatioStyle(width, height, "9/16")}>
         <video
           ref={videoRef}
           src={currentSrc}
           poster={poster || undefined}
-          controls
           playsInline
           preload="metadata"
           className="absolute inset-0 h-full w-full object-contain"
@@ -341,15 +361,26 @@ function VideoPlayer({ src, poster, mediaType, width, height, onDurationChange, 
         </div>
         <div className="mt-1.5 flex items-center justify-between text-[11px] font-medium tabular-nums text-white/60">
           <span>{formatTime(currentTime)} / {formatTime(duration)}</span>
-          <button
-            type="button"
-            onClick={toggleMute}
-            className="flex min-h-[32px] min-w-[44px] items-center justify-center rounded-lg px-2 text-[11px] font-semibold text-white/70 transition-colors hover:text-white"
-            aria-label={muted ? "Unmute video" : "Mute video"}
-            aria-pressed={muted}
-          >
-            {muted ? "Unmute" : "Mute"}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={toggleMute}
+              className="flex min-h-[32px] min-w-[44px] items-center justify-center rounded-lg px-2 text-[11px] font-semibold text-white/70 transition-colors hover:text-white"
+              aria-label={muted ? "Unmute video" : "Mute video"}
+              aria-pressed={muted}
+            >
+              {muted ? "Unmute" : "Mute"}
+            </button>
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/70 transition-colors hover:text-white"
+              aria-label={fullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              aria-pressed={fullscreen}
+            >
+              {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
       </div>
     </div>
