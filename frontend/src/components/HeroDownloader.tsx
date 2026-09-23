@@ -221,7 +221,11 @@ function VideoPlayer({ src, poster, mediaType, width, height, onDurationChange, 
         onResolution?.(v.videoWidth, v.videoHeight);
       }
     };
-    const onEnd = () => { setPlaying(false); setCurrent(0); };
+    const onEnd = () => {
+      v.pause();
+      setPlaying(false);
+      setCurrent(0);
+    };
     const onError = () => {
       if (process.env.NODE_ENV === "development") {
         try {
@@ -266,11 +270,20 @@ function VideoPlayer({ src, poster, mediaType, width, height, onDurationChange, 
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
 
-  const togglePlay = useCallback(() => {
+  const togglePlay = useCallback(async () => {
     const v = videoRef.current;
     if (!v) return;
-    if (v.paused) v.play().catch(() => {});
-    else v.pause();
+    if (v.paused || v.ended) {
+      if (v.ended) v.currentTime = 0;
+      try {
+        await v.play();
+      } catch {
+        // Playback can be rejected by the browser; media events remain the
+        // only source of truth for the React playing state.
+      }
+    } else {
+      v.pause();
+    }
   }, []);
 
   const handleSeek = useCallback(
