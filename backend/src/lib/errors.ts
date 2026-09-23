@@ -157,6 +157,11 @@ export const ERRORS: Record<ErrorCode, { message: string; status: number; retrya
     status: 502,
     retryable: true,
   },
+  STORY_SOURCE_UNAVAILABLE: {
+    message: "Instagram did not expose a downloadable story source to this backend.",
+    status: 502,
+    retryable: false,
+  },
 };
 
 export function createError(code: ErrorCode): AppError {

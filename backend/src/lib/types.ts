@@ -82,7 +82,8 @@ export type ErrorCode =
   | "INVALID_PROVIDER_RESPONSE"
   | "VALIDATION_ERROR"
   | "REQUEST_TOO_LARGE"
-  | "VIDEO_SOURCE_NOT_FOUND";
+  | "VIDEO_SOURCE_NOT_FOUND"
+  | "STORY_SOURCE_UNAVAILABLE";
 
 export interface ResolverResult {
   type: InstagramContentType;

@@ -12,6 +12,7 @@ const TRACKING_PARAMS = new Set([
   "utm_term",
   "fbclid",
   "feature",
+  "stkn",
 ]);
 
 export interface ParsedInstagramUrl {
@@ -21,6 +22,7 @@ export interface ParsedInstagramUrl {
   contentType: string | null;
   shortcode: string | null;
   storyUsername: string | null;
+  storyId: string | null;
   highlightId: string | null;
   /**
    * 0-based carousel start slide from `?img_index=N` (Instagram numbers
@@ -104,6 +106,7 @@ export function validateInstagramUrl(raw: string): {
       contentType,
       shortcode: extractShortcode(parsed.pathname),
       storyUsername: extractStoryUsername(parsed.pathname),
+      storyId: extractStoryId(parsed.pathname),
       highlightId: extractHighlightId(parsed.pathname),
       slideIndex: extractSlideIndex(parsed.searchParams),
       audioId: extractAudioId(parsed.pathname),
@@ -112,7 +115,7 @@ export function validateInstagramUrl(raw: string): {
 }
 
 function detectContentTypeFromPath(pathname: string): string | null {
-  const segments = pathname.split("/").filter(Boolean);
+  const segments = pathname.split("/").filter(Boolean).map((segment) => segment.toLowerCase());
 
   // Public sound/audio pages (e.g. /reels/audio/<id>/) resolve to AUDIO so
   // the result UI switches to audio mode instead of treating them as Reels.
@@ -125,7 +128,7 @@ function detectContentTypeFromPath(pathname: string): string | null {
   if (segments[0] === "tv") return "VIDEO";
   if (segments[0] === "stories") {
     if (segments.includes("highlights")) return "HIGHLIGHT";
-    return "STORY";
+    return segments.length >= 3 ? "STORY" : null;
   }
   if (segments[0] === "explore") return null;
 
@@ -145,16 +148,24 @@ function extractShortcode(pathname: string): string | null {
 
 function extractStoryUsername(pathname: string): string | null {
   const segments = pathname.split("/").filter(Boolean);
-  if (segments[0] === "stories" && segments[1]) {
+  if (segments[0]?.toLowerCase() === "stories" && segments.length >= 3 && segments[1]) {
     return segments[1];
+  }
+  return null;
+}
+
+function extractStoryId(pathname: string): string | null {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments[0]?.toLowerCase() === "stories" && segments.length >= 3 && segments[1].toLowerCase() !== "highlights") {
+    return segments[2] || null;
   }
   return null;
 }
 
 function extractHighlightId(pathname: string): string | null {
   const segments = pathname.split("/").filter(Boolean);
-  if (segments[0] === "stories" && segments.includes("highlights")) {
-    const highlightIdx = segments.indexOf("highlights");
+  if (segments[0]?.toLowerCase() === "stories" && segments.some((segment) => segment.toLowerCase() === "highlights")) {
+    const highlightIdx = segments.findIndex((segment) => segment.toLowerCase() === "highlights");
     return segments[highlightIdx + 1] || null;
   }
   return null;

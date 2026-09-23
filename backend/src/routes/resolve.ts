@@ -87,6 +87,8 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       requestId,
       contentType: validation.parsed.contentType,
       shortcode: validation.parsed.shortcode,
+      storyUsername: validation.parsed.storyUsername,
+      storyId: validation.parsed.storyId,
     });
 
     const result = await resolveUrl(validation.parsed.normalized);

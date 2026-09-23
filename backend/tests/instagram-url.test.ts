@@ -57,6 +57,24 @@ describe("validateInstagramUrl", () => {
       const result = validateInstagramUrl("https://www.instagram.com/stories/username/12345/");
       expect(result.valid).toBe(true);
       expect(result.parsed?.contentType).toBe("STORY");
+      expect(result.parsed?.storyUsername).toBe("username");
+      expect(result.parsed?.storyId).toBe("12345");
+    });
+
+    it("keeps story identity while stripping tracking parameters", () => {
+      const withTracking = validateInstagramUrl(
+        "https://www.instagram.com/stories/akhyanx/3992641005173656578?utm_source=ig_story_item_share&stkn=abc"
+      );
+      const withoutTracking = validateInstagramUrl(
+        "https://www.instagram.com/stories/akhyanx/3992641005173656578"
+      );
+      expect(withTracking.valid).toBe(true);
+      expect(withTracking.parsed?.normalized).toBe(
+        "https://www.instagram.com/stories/akhyanx/3992641005173656578"
+      );
+      expect(withTracking.parsed?.normalized).not.toContain("utm_source");
+      expect(withTracking.parsed?.normalized).toBe(withoutTracking.parsed?.normalized);
+      expect(withTracking.parsed?.storyId).toBe("3992641005173656578");
     });
 
     it("accepts a highlight URL", () => {
