@@ -3,6 +3,7 @@ import type { InstagramContentType } from "../types.js";
 export function detectContentType(pathname: string): InstagramContentType {
   const segments = pathname.split("/").filter(Boolean);
 
+  if (segments[0] === "reels" && segments[1] === "audio") return "AUDIO";
   if (segments[0] === "reel" || segments[0] === "reels") return "REEL";
   if (segments[0] === "p") return "POST";
   if (segments[0] === "tv") return "VIDEO";
@@ -23,6 +24,7 @@ export function isSupportedContent(type: InstagramContentType): boolean {
     "PHOTO",
     "STORY",
     "HIGHLIGHT",
+    "AUDIO",
   ];
   return supported.includes(type);
 }

@@ -605,7 +605,13 @@ export class PuppeteerProvider extends BaseProvider {
 
       // Fast path: video pages usually expose og:video in plain HTML.
       // Skips Chromium entirely when the direct video URL is already known.
-      const isVideoPage = url.includes("/reel/") || url.includes("/reels/") || url.includes("/tv/");
+      // Audio pages are included: when their sound page exposes a playable
+      // source the audio flow can proceed without launching the browser.
+      const isVideoPage =
+        url.includes("/reel/") ||
+        url.includes("/reels/") ||
+        url.includes("/tv/") ||
+        url.includes("/reels/audio/");
       if (isVideoPage && fetchMeta.ogVideo && !fetchMeta.loginWall) {
         const result = this.buildResultFromVideo(url, fetchMeta.ogVideo, fetchMeta);
         timings.totalMs = Date.now() - startTime;
@@ -949,6 +955,9 @@ export class PuppeteerProvider extends BaseProvider {
         // A Reel/TV page with no discoverable video must NEVER degrade into
         // a fake photo result — surface an honest diagnostic error instead.
         const noVideoKind = this.detectContentType(url);
+        if (noVideoKind === "AUDIO") {
+          throw createError("AUDIO_UNAVAILABLE");
+        }
         if (noVideoKind === "REEL" || noVideoKind === "VIDEO") {
           throw createError("VIDEO_SOURCE_NOT_FOUND");
         }
@@ -1076,6 +1085,7 @@ export class PuppeteerProvider extends BaseProvider {
   }
 
   private detectContentType(url: string): InstagramContentType {
+    if (url.includes("/reels/audio/")) return "AUDIO";
     if (url.includes("/reel/") || url.includes("/reels/")) return "REEL";
     if (url.includes("/stories/")) {
       if (url.includes("/highlights/")) return "HIGHLIGHT";

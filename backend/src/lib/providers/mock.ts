@@ -6,6 +6,7 @@ export class MockProvider extends BaseProvider {
 
   private determineType(pathname: string): InstagramContentType {
     const segments = pathname.split("/").filter(Boolean);
+    if (segments[0] === "reels" && segments[1] === "audio") return "AUDIO";
     if (segments[0] === "reel" || segments[0] === "reels") return "REEL";
     if (segments[0] === "p") return "POST";
     if (segments[0] === "tv") return "VIDEO";
@@ -22,7 +23,8 @@ export class MockProvider extends BaseProvider {
     const segments = parsed.pathname.split("/").filter(Boolean);
     const shortcode = segments[1] || "MOCK123";
 
-    const isVideo = type === "REEL" || type === "VIDEO";
+    // AUDIO pages resolve to a playable source video whose track is extracted.
+    const isVideo = type === "REEL" || type === "VIDEO" || type === "AUDIO";
 
     let media: MediaItem[] = [];
 

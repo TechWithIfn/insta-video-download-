@@ -10,6 +10,10 @@ describe("detectContentType", () => {
     expect(detectContentType("/reels/Cxyz123/")).toBe("REEL");
   });
 
+  it("detects audio page URLs as AUDIO, not reels", () => {
+    expect(detectContentType("/reels/audio/409293986509384/")).toBe("AUDIO");
+  });
+
   it("detects post URLs", () => {
     expect(detectContentType("/p/Cxyz123/")).toBe("POST");
   });
@@ -74,5 +78,9 @@ describe("isSupportedContent", () => {
 
   it("returns true for PHOTO", () => {
     expect(isSupportedContent("PHOTO")).toBe(true);
+  });
+
+  it("returns true for AUDIO", () => {
+    expect(isSupportedContent("AUDIO")).toBe(true);
   });
 });

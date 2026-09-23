@@ -486,7 +486,7 @@ interface MediaResultProps {
 }
 
 function formatBytes(size: number | null | undefined): string {
-  if (typeof size !== "number" || !isFinite(size) || size <= 0) return "—";
+  if (typeof size !== "number" || !isFinite(size) || size <= 0) return "Unknown";
   if (size < 1024) return `${size} B`;
   const units = ["KB", "MB", "GB"];
   let v = size / 1024;
@@ -497,12 +497,12 @@ function formatBytes(size: number | null | undefined): string {
 
 function formatResolution(w: number | null | undefined, h: number | null | undefined): string {
   if (typeof w === "number" && w > 0 && typeof h === "number" && h > 0) return `${w}×${h}`;
-  return "—";
+  return "Unknown";
 }
 
 function formatMetaDuration(d: number | null | undefined, fallback: number | null): string {
   const v = typeof d === "number" && isFinite(d) && d > 0 ? d : (typeof fallback === "number" && isFinite(fallback) && fallback > 0 ? fallback : null);
-  if (v === null) return "—";
+  if (v === null) return "Unknown";
   return formatTime(v);
 }
 
@@ -790,47 +790,25 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
                 onResolution={(w, h) => setRealResolution({ w, h })}
               />
             ) : imgFailed ? (
-              <div className="flex w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-black/5" style={aspectRatioStyle(currentMedia.width, currentMedia.height, "4/3")}>
+              <div className="flex min-h-[180px] w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-black/5">
                 <ImageIcon className="h-10 w-10" style={{ color: "var(--fg-subtle)", opacity: 0.4 }} />
                 <p className="text-xs" style={{ color: "var(--fg-subtle)" }}>
                   {t.result.previewUnavailable}
                 </p>
               </div>
             ) : (
+              // Natural-height render: the image keeps its own aspect ratio
+              // (portrait / landscape / square) with object-fit contain, so it
+              // is never cropped, stretched, or boxed into a fixed ratio.
               // eslint-disable-next-line @next/next/no-img-element -- next/image cannot serve our dynamic backend /api/stream proxy URLs; plain img streams from our own backend exactly like <video> does
               <img
                 key={currentMedia.url}
                 src={imgSrc ?? streamSrc}
                 alt={result.title ? decodeHtmlEntities(result.title).slice(0, 120) : t.typeBadges.photo}
-                className="media-frame w-full rounded-[20px] object-contain"
-                style={{ background: "#0a0a14", ...aspectRatioStyle(currentMedia.width, currentMedia.height, "4/3") } as React.CSSProperties}
+                className="media-frame media-natural w-full rounded-[20px] object-contain"
+                style={{ background: "#0a0a14", aspectRatio: "auto", height: "auto", display: "block" } as React.CSSProperties}
                 onError={handleImgError}
               />
-            )}
-            {showCarouselNav && (
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={goPrev}
-                  disabled={safeIndex === 0}
-                  className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-[12px] border border-border bg-card px-3 text-[13px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label="Previous media"
-                >
-                  &lt; Previous
-                </button>
-                <span className="shrink-0 px-2 text-[13px] font-bold tabular-nums text-fg-muted" aria-live="polite">
-                  {safeIndex + 1} / {items.length}
-                </span>
-                <button
-                  type="button"
-                  onClick={goNext}
-                  disabled={safeIndex === items.length - 1}
-                  className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-[12px] border border-border bg-card px-3 text-[13px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label="Next media"
-                >
-                  Next &gt;
-                </button>
-              </div>
             )}
           </div>
 
@@ -880,10 +858,12 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
               </p>
             )}
             <dl className="grid grid-cols-2 gap-2 text-[12.5px]">
-              <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
-                <dt className="font-medium text-fg-subtle">Resolution</dt>
-                <dd className="mt-0.5 font-semibold tabular-nums text-fg">{isAudio ? "—" : formatResolution(effW, effH)}</dd>
-              </div>
+              {!isAudio && (
+                <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                  <dt className="font-medium text-fg-subtle">Resolution</dt>
+                  <dd className="mt-0.5 font-semibold tabular-nums text-fg">{formatResolution(effW, effH)}</dd>
+                </div>
+              )}
               <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
                 <dt className="font-medium text-fg-subtle">File Size</dt>
                 <dd className="mt-0.5 font-semibold tabular-nums text-fg">{isAudio ? "MP3 · 192k" : formatBytes(currentMedia?.size)}</dd>
@@ -896,11 +876,38 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
               )}
               <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
                 <dt className="font-medium text-fg-subtle">Format</dt>
-                <dd className="mt-0.5 font-semibold text-fg">{isAudio ? "MP3" : (currentMedia ? labelForMedia(currentMedia) : "—")}</dd>
+                <dd className="mt-0.5 font-semibold text-fg">{isAudio ? "MP3" : (currentMedia ? labelForMedia(currentMedia) : "Unknown")}</dd>
               </div>
             </dl>
           </div>
         </div>
+
+        {/* Carousel navigation sits last and ONLY for real carousel posts. */}
+        {showCarouselNav && (
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={goPrev}
+              disabled={safeIndex === 0}
+              className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-[12px] border border-border bg-card px-3 text-[13px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Previous media"
+            >
+              &lt; Previous
+            </button>
+            <span className="shrink-0 px-2 text-[13px] font-bold tabular-nums text-fg-muted" aria-live="polite">
+              {safeIndex + 1} / {items.length}
+            </span>
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={safeIndex === items.length - 1}
+              className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-[12px] border border-border bg-card px-3 text-[13px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Next media"
+            >
+              Next &gt;
+            </button>
+          </div>
+        )}
       </div>
 
       <p className="mt-4 break-words px-2 text-center text-[12px] text-fg-subtle sm:text-[12.5px]">{t.result.tempNote}</p>

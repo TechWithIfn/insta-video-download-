@@ -21,6 +21,12 @@ describe("validateInstagramUrl", () => {
       expect(result.parsed?.contentType).toBe("REEL");
     });
 
+    it("accepts an audio page URL as AUDIO, not a reel", () => {
+      const result = validateInstagramUrl("https://www.instagram.com/reels/audio/409293986509384/");
+      expect(result.valid).toBe(true);
+      expect(result.parsed?.contentType).toBe("AUDIO");
+    });
+
     it("accepts a story URL", () => {
       const result = validateInstagramUrl("https://www.instagram.com/stories/username/12345/");
       expect(result.valid).toBe(true);

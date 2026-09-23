@@ -163,6 +163,8 @@ export class ExternalProvider extends BaseProvider {
       video: "VIDEO",
       PHOTO: "PHOTO",
       photo: "PHOTO",
+      AUDIO: "AUDIO",
+      audio: "AUDIO",
     };
     return map[rawType || ""] || "UNKNOWN";
   }

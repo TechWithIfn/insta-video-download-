@@ -411,6 +411,15 @@ button:focus-visible {
 .media-frame {
   max-height: 560px;
 }
+
+/* Natural image previews: the image's own ratio rules — never force a fixed
+   box (this beats the phone 9/16 rules below by specificity). Height stays
+   automatic so portrait/landscape/square each fit without empty space. */
+.result-video-wrap img.media-natural.media-frame {
+  aspect-ratio: auto;
+  height: auto;
+  max-width: 100%;
+}
 @media (max-width: 639.98px) {
   .media-frame {
     max-height: 70vh;

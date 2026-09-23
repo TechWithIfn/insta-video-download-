@@ -6,6 +6,7 @@ export type InstagramContentType =
   | "HIGHLIGHT"
   | "VIDEO"
   | "PHOTO"
+  | "AUDIO"
   | "UNKNOWN";
 
 export interface Author {

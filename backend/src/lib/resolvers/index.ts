@@ -1,6 +1,7 @@
 import type { InstagramResolver, ResolverResult, ResolveProgressCallback } from "../types.js";
 import { createProvider } from "../providers/index.js";
 import { getCachedResult, setCachedResult, deleteCachedResult } from "../provider-cache.js";
+import { enrichMediaItems } from "../media-enrich.js";
 import { hashUrl } from "../crypto.js";
 import { logger } from "../logger.js";
 
@@ -79,7 +80,12 @@ export async function resolveUrl(
     });
     onProgress?.(25, "Starting resolution");
     const raw = await resolver.resolve(url, onProgress);
-    const result = normalizeResultType(raw);
+    const normalized = normalizeResultType(raw);
+    // Fill gaps the provider left (size/format/dimensions) from the real
+    // media bytes: bounded parallel probes, never fails the resolve, and the
+    // enriched result is what gets cached so carousels never re-probe.
+    const media = await enrichMediaItems(normalized.media);
+    const result: ResolverResult = { ...normalized, media };
     setCachedResult(url, result);
     return result;
   })();
