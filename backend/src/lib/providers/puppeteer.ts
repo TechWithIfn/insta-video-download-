@@ -619,7 +619,16 @@ function isTrustedCdnUrl(raw: string): boolean {
  * Plain-HTTP page fetch shared by metadata extraction and the dedicated
  * audio-page resolver. Returns raw HTML, or null on any failure.
  */
-export async function fetchPageHtml(url: string, timeoutMs = 10_000): Promise<string | null> {
+interface PageFetchResult {
+  html: string | null;
+  status: number | null;
+  contentType: string | null;
+  finalHost: string | null;
+  finalPath: string | null;
+  error: string | null;
+}
+
+async function fetchPageSnapshot(url: string, timeoutMs = 10_000): Promise<PageFetchResult> {
   try {
     const res = await fetch(url, {
       headers: {
@@ -631,12 +640,40 @@ export async function fetchPageHtml(url: string, timeoutMs = 10_000): Promise<st
       signal: AbortSignal.timeout(timeoutMs),
     });
     const ct = res.headers.get("content-type") || "";
+    const final = new URL(res.url || url);
+    const base = {
+      status: res.status,
+      contentType: ct || null,
+      finalHost: final.hostname,
+      finalPath: final.pathname,
+      error: null,
+    };
     if (!res.ok || (!ct.includes("text/html") && !ct.includes("application/xhtml"))) {
-      return null;
+      await res.body?.cancel().catch(() => {});
+      return { ...base, html: null };
     }
-    return await res.text();
+    return { ...base, html: await res.text() };
+  } catch (error) {
+    return {
+      html: null,
+      status: null,
+      contentType: null,
+      finalHost: null,
+      finalPath: null,
+      error: error instanceof Error ? error.name : "fetch-failed",
+    };
+  }
+}
+
+export async function fetchPageHtml(url: string, timeoutMs = 10_000): Promise<string | null> {
+  return (await fetchPageSnapshot(url, timeoutMs)).html;
+}
+
+function isLikelyProfileImageUrl(url: string): boolean {
+  try {
+    return /\/t51\.[^/]+-19\//i.test(new URL(url).pathname);
   } catch {
-    return null;
+    return false;
   }
 }
 
@@ -644,6 +681,13 @@ export async function fetchMetadata(url: string): Promise<{
   ogImage: string | null;
   ogVideo: string | null;
   embeddedMedia: ExtractedMedia[];
+  pageStatus: number | null;
+  pageContentType: string | null;
+  pageFinalHost: string | null;
+  pageFinalPath: string | null;
+  pageError: string | null;
+  htmlLength: number;
+  hasChallenge: boolean;
   title: string | null;
   description: string | null;
   author: Author | null;
@@ -653,14 +697,32 @@ export async function fetchMetadata(url: string): Promise<{
     ogImage: null,
     ogVideo: null,
     embeddedMedia: [],
+    pageStatus: null,
+    pageContentType: null,
+    pageFinalHost: null,
+    pageFinalPath: null,
+    pageError: null,
+    htmlLength: 0,
+    hasChallenge: false,
     title: null,
     description: null,
     author: extractAuthorFromUrl(url),
     loginWall: false,
   };
   try {
-    const html = await fetchPageHtml(url);
-    if (!html) return empty;
+    const page = await fetchPageSnapshot(url);
+    const html = page.html;
+    const pageInfo = {
+      pageStatus: page.status,
+      pageContentType: page.contentType,
+      pageFinalHost: page.finalHost,
+      pageFinalPath: page.finalPath,
+      pageError: page.error,
+      htmlLength: html?.length || 0,
+    };
+    if (!html) return { ...empty, ...pageInfo };
+
+    const hasChallenge = /suspicious activity|verify your identity/i.test(html);
 
     // Instagram serves its login page (with ITS OWN og:image) to anonymous
     // requests for gated content. Never treat that as the post's media.
@@ -670,7 +732,7 @@ export async function fetchMetadata(url: string): Promise<{
       html.includes("loginForm") ||
       html.includes('"requireLogin":true')
     ) {
-      return { ...empty, loginWall: true };
+      return { ...empty, ...pageInfo, hasChallenge, loginWall: true };
     }
 
     const ogImageMatch =
@@ -703,6 +765,8 @@ export async function fetchMetadata(url: string): Promise<{
       ogImage: rawImage && isTrustedCdnUrl(rawImage) ? rawImage : null,
       ogVideo: rawVideo && isTrustedCdnUrl(rawVideo) ? rawVideo : null,
       embeddedMedia,
+      ...pageInfo,
+      hasChallenge,
       title: extractTitleFromHtml(html),
       description: extractDescriptionFromHtml(html),
       author: extractAuthorFromHtml(html) || extractAuthorFromUrl(url),
@@ -938,6 +1002,26 @@ export class PuppeteerProvider extends BaseProvider {
       timings.metadataMs = Date.now() - metaStart;
       onProgress?.(35, "Media source opened");
 
+      const isStory = this.detectContentType(url) === "STORY";
+      const storySegments = new URL(url).pathname.split("/").filter(Boolean);
+      if (isStory) {
+        logger.info("Story extraction diagnostics", {
+          normalizedUrl: url,
+          username: storySegments[1] || null,
+          storyId: storySegments[2] || null,
+          pageStatus: fetchMeta.pageStatus,
+          pageFinalHost: fetchMeta.pageFinalHost,
+          pageFinalPath: fetchMeta.pageFinalPath,
+          loginWall: fetchMeta.loginWall,
+          challenge: fetchMeta.hasChallenge,
+          hasOgImage: Boolean(fetchMeta.ogImage),
+          hasOgVideo: Boolean(fetchMeta.ogVideo),
+          embeddedMediaCount: fetchMeta.embeddedMedia.length,
+          htmlLength: fetchMeta.htmlLength,
+          pageError: fetchMeta.pageError,
+        });
+      }
+
       // Story pages may expose the actual item as og metadata or embedded
       // JSON. Resolve those candidates before opening a browser, while never
       // treating the story ID as a post shortcode.
@@ -945,7 +1029,10 @@ export class PuppeteerProvider extends BaseProvider {
         const storyCandidate =
           (fetchMeta.ogVideo && { url: fetchMeta.ogVideo, type: "video" as const }) ||
           fetchMeta.embeddedMedia.find((item) => item.type === "video") ||
-          (fetchMeta.ogImage && { url: fetchMeta.ogImage, type: "image" as const }) ||
+          (fetchMeta.ogImage && !isLikelyProfileImageUrl(fetchMeta.ogImage) && {
+            url: fetchMeta.ogImage,
+            type: "image" as const,
+          }) ||
           fetchMeta.embeddedMedia.find((item) => item.type === "image");
         if (storyCandidate && this.validateMediaUrl(storyCandidate.url)) {
           logger.info("Puppeteer story fast path", {
@@ -1061,7 +1148,7 @@ export class PuppeteerProvider extends BaseProvider {
         });
 
         // If browser fails, return what we got from fetch
-        if (fetchMeta.ogImage) {
+        if (fetchMeta.ogImage && (!isStory || !isLikelyProfileImageUrl(fetchMeta.ogImage))) {
           return this.buildResultFromMetadata(url, fetchMeta);
         }
         throw createError("PROVIDER_UNAVAILABLE");
@@ -1070,7 +1157,7 @@ export class PuppeteerProvider extends BaseProvider {
       onProgress?.(50, "Browser ready");
 
       if (!this.browser) {
-        if (fetchMeta.ogImage) {
+        if (fetchMeta.ogImage && (!isStory || !isLikelyProfileImageUrl(fetchMeta.ogImage))) {
           return this.buildResultFromMetadata(url, fetchMeta);
         }
         throw createError("PROVIDER_UNAVAILABLE");
@@ -1100,6 +1187,9 @@ export class PuppeteerProvider extends BaseProvider {
         try {
           const type = intercepted.resourceType();
           const target = intercepted.url();
+          if (type === "media" || type === "image" || type === "video") {
+            interceptedMediaRequestCount++;
+          }
           let isTrustedImage = false;
           if (type === "image") {
             try {
@@ -1132,6 +1222,8 @@ export class PuppeteerProvider extends BaseProvider {
       // different API endpoints (GraphQL, web API, feed, etc.) so we must
       // check ALL JSON responses for media-related keywords.
       const interceptedMedia: ExtractedMedia[] = [];
+      let interceptedMediaRequestCount = 0;
+      let capturedCdnMediaUrlCount = 0;
       // Pagination state for sidecar children: when an intercepted API page
       // reports has_next_page, the cursor is followed after the browser pass.
       // Stored on a const container because TS control-flow ignores writes
@@ -1215,6 +1307,7 @@ export class PuppeteerProvider extends BaseProvider {
                 contentType: resContentType.slice(0, 80),
               });
               if (isTrustedCdnUrl(resUrl) && !interceptedMedia.some((m) => m.url === resUrl)) {
+                capturedCdnMediaUrlCount++;
                 interceptedMedia.push({
                   url: resUrl,
                   type: ctLower.startsWith("video/") || resourceType === "media" ? "video" : "image",
@@ -1455,6 +1548,7 @@ export class PuppeteerProvider extends BaseProvider {
       const seenUrls = new Set<string>();
 
       const addUnique = (item: ExtractedMedia) => {
+        if (isStory && item.type === "image" && isLikelyProfileImageUrl(item.url)) return;
         if (!seenUrls.has(item.url)) {
           seenUrls.add(item.url);
           allMedia.push(item);
@@ -1479,7 +1573,9 @@ export class PuppeteerProvider extends BaseProvider {
         addUnique({ url: fetchMeta.ogVideo, type: "video", width: null, height: null });
       }
       if (fetchMeta.ogImage && !seenUrls.has(fetchMeta.ogImage)) {
-        addUnique({ url: fetchMeta.ogImage, type: "image", width: null, height: null });
+        if (!isStory || !isLikelyProfileImageUrl(fetchMeta.ogImage)) {
+          addUnique({ url: fetchMeta.ogImage, type: "image", width: null, height: null });
+        }
       }
 
       logger.debug("[Downloadit Puppeteer Media Debug] candidates", {
@@ -1517,9 +1613,23 @@ export class PuppeteerProvider extends BaseProvider {
         logger.error("Puppeteer NO_MEDIA_FOUND", {
           url,
           interceptedCount: interceptedMedia.length,
+          interceptedMediaRequestCount,
+          capturedCdnMediaUrlCount,
           domVideoCount: domResult.videos.length,
           domImageCount: domResult.images.length,
           renderedHtmlMediaCount: renderedHtmlMedia.length,
+          renderedHtmlStoryMediaCount: renderedHtmlMedia.filter(
+            (item) => !isStory || !isLikelyProfileImageUrl(item.url)
+          ).length,
+          domStoryMediaCount: isStory
+            ? [...domResult.videos, ...domResult.images].filter(
+                (item) => !isLikelyProfileImageUrl(item)
+              ).length
+            : domResult.videos.length + domResult.images.length,
+          embeddedMediaCount: fetchMeta.embeddedMedia.length,
+          pageStatus: fetchMeta.pageStatus,
+          loginWall: fetchMeta.loginWall,
+          challenge: fetchMeta.hasChallenge,
           duration: Date.now() - startTime,
         });
         // A Reel/TV page with no discoverable video must NEVER degrade into
@@ -1541,7 +1651,17 @@ export class PuppeteerProvider extends BaseProvider {
         if (noVideoKind === "STORY") {
           logger.warn("STORY_SOURCE_UNAVAILABLE", {
             url,
-            reason: pageState.hasLoginWall || pageState.hasChallenge ? "authentication-required" : "no-public-media-exposed",
+            reason: pageState.hasLoginWall
+              ? "authentication-required"
+              : pageState.hasChallenge
+                ? "challenge-required"
+                : fetchMeta.pageStatus !== 200
+                  ? `instagram-page-status-${fetchMeta.pageStatus ?? "unknown"}`
+                  : "no-public-media-exposed",
+            interceptedMediaRequestCount,
+            capturedCdnMediaUrlCount,
+            renderedHtmlMediaCount: renderedHtmlMedia.length,
+            embeddedMediaCount: fetchMeta.embeddedMedia.length,
           });
           throw createError("STORY_SOURCE_UNAVAILABLE");
         }
