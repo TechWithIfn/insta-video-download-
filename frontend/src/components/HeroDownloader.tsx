@@ -101,6 +101,27 @@ const TABS = [
 
 export type DownloaderTab = (typeof TABS)[number]["id"];
 
+function resolveTabFromResultType(type: string): DownloaderTab | null {
+  switch (type) {
+    case "REEL":
+      return "reels";
+    case "VIDEO":
+      return "videos";
+    case "POST":
+    case "PHOTO":
+    case "CAROUSEL":
+      return "photos";
+    case "STORY":
+      return "stories";
+    case "HIGHLIGHT":
+      return "highlights";
+    case "AUDIO":
+      return "audio";
+    default:
+      return null;
+  }
+}
+
 // ─── Circular progress (REAL backend stages only) ────────────
 // The value shown here comes exclusively from `progress` SSE events sent
 // by the backend after each resolution stage actually completes. This
@@ -160,13 +181,21 @@ function CircularProgress({ value, label }: { value: number; label: string }) {
 
 // ─── Video Player ─────────────────────────────────────────
 
-function VideoPlayer({ src, poster, mediaType, onDurationChange }: { src: string; poster?: string; mediaType?: string; onDurationChange?: (duration: number) => void }) {
+function aspectRatioStyle(width?: number | null, height?: number | null, fallback = "9/16"): React.CSSProperties {
+  if (width && height && width > 0 && height > 0) {
+    return { aspectRatio: `${width} / ${height}` };
+  }
+  return { aspectRatio: fallback };
+}
+
+function VideoPlayer({ src, poster, mediaType, width, height, onDurationChange, onResolution }: { src: string; poster?: string; mediaType?: string; width?: number | null; height?: number | null; onDurationChange?: (duration: number) => void; onResolution?: (w: number, h: number) => void }) {
   const { t } = useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [muted, setMuted] = useState(false);
   const [mediaError, setMediaError] = useState(false);
   const retryCountRef = useRef(0);
   const [currentSrc, setCurrentSrc] = useState(src);
@@ -181,6 +210,9 @@ function VideoPlayer({ src, poster, mediaType, onDurationChange }: { src: string
       const nextDuration = Number.isFinite(v.duration) && v.duration >= 0 ? v.duration : 0;
       setDuration(nextDuration);
       onDurationChange?.(nextDuration);
+      if (v.videoWidth > 0 && v.videoHeight > 0) {
+        onResolution?.(v.videoWidth, v.videoHeight);
+      }
     };
     const onEnd = () => { setPlaying(false); setCurrent(0); };
     const onError = () => {
@@ -216,7 +248,8 @@ function VideoPlayer({ src, poster, mediaType, onDurationChange }: { src: string
       v.removeEventListener("ended", onEnd);
       v.removeEventListener("error", onError);
     };
-  }, [currentSrc, mediaType, onDurationChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSrc, mediaType]);
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
@@ -239,6 +272,13 @@ function VideoPlayer({ src, poster, mediaType, onDurationChange }: { src: string
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  const toggleMute = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = !v.muted;
+    setMuted(v.muted);
+  }, []);
+
   if (mediaError) {
     return (
       <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-black/5">
@@ -250,7 +290,7 @@ function VideoPlayer({ src, poster, mediaType, onDurationChange }: { src: string
 
   return (
     <div className="relative overflow-hidden rounded-[20px]" style={{ background: "#0a0a14" }}>
-      <div className="relative w-full media-frame" style={{ aspectRatio: "9/16" }}>
+      <div className="relative w-full media-frame" style={aspectRatioStyle(width, height, "9/16")}>
         <video
           ref={videoRef}
           src={currentSrc}
@@ -274,7 +314,7 @@ function VideoPlayer({ src, poster, mediaType, onDurationChange }: { src: string
         )}
       </div>
 
-      {/* Progress bar */}
+      {/* Progress bar + time + mute */}
       <div className="px-4 pt-2 pb-3">
         <div
           ref={progressRef}
@@ -297,8 +337,16 @@ function VideoPlayer({ src, poster, mediaType, onDurationChange }: { src: string
           />
         </div>
         <div className="mt-1.5 flex items-center justify-between text-[11px] font-medium tabular-nums text-white/60">
-          <span>{formatTime(currentTime)}</span>
-          <span>{formatTime(duration)}</span>
+          <span>{formatTime(currentTime)} / {formatTime(duration)}</span>
+          <button
+            type="button"
+            onClick={toggleMute}
+            className="flex min-h-[32px] min-w-[44px] items-center justify-center rounded-lg px-2 text-[11px] font-semibold text-white/70 transition-colors hover:text-white"
+            aria-label={muted ? "Unmute video" : "Mute video"}
+            aria-pressed={muted}
+          >
+            {muted ? "Unmute" : "Mute"}
+          </button>
         </div>
       </div>
     </div>
@@ -437,12 +485,57 @@ interface MediaResultProps {
   onReset: () => void;
 }
 
+function formatBytes(size: number | null | undefined): string {
+  if (typeof size !== "number" || !isFinite(size) || size <= 0) return "—";
+  if (size < 1024) return `${size} B`;
+  const units = ["KB", "MB", "GB"];
+  let v = size / 1024;
+  let u = 0;
+  while (v >= 1024 && u < units.length - 1) { v /= 1024; u++; }
+  return `${v >= 100 ? Math.round(v) : v.toFixed(1)} ${units[u]}`;
+}
+
+function formatResolution(w: number | null | undefined, h: number | null | undefined): string {
+  if (typeof w === "number" && w > 0 && typeof h === "number" && h > 0) return `${w}×${h}`;
+  return "—";
+}
+
+function formatMetaDuration(d: number | null | undefined, fallback: number | null): string {
+  const v = typeof d === "number" && isFinite(d) && d > 0 ? d : (typeof fallback === "number" && isFinite(fallback) && fallback > 0 ? fallback : null);
+  if (v === null) return "—";
+  return formatTime(v);
+}
+
+function extForMedia(m: { type: string; format?: string | null; url: string }): string {
+  const f = (m.format || "").toLowerCase();
+  if (m.type === "video") return "mp4";
+  if (f.includes("png")) return "png";
+  if (f.includes("webp")) return "webp";
+  if (f.includes("jpg") || f.includes("jpeg")) return "jpg";
+  if (m.url.includes(".png")) return "png";
+  if (m.url.includes(".webp")) return "webp";
+  return "jpg";
+}
+
+function labelForMedia(m: { type: string; format?: string | null }): string {
+  if (m.type === "video") return "MP4";
+  const f = (m.format || "").toUpperCase();
+  if (f === "JPG" || f === "JPEG") return "JPG";
+  if (f === "PNG" || f === "WEBP" || f === "MP4") return f;
+  return m.type === "image" ? "JPG" : "—";
+}
+
 function MediaResult({ result, mode, onReset }: MediaResultProps) {
   const { t } = useLanguage();
   const [downloading, setDownloading] = useState<"idle" | "preparing" | "error">("idle");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioLoading, setAudioLoading] = useState(true);
   const [audioError, setAudioError] = useState<string | null>(null);
+  // Carousel / highlight navigation: one item visible at a time.
+  const [currentIndex, setCurrentIndex] = useState(0);
+  // Real duration/resolution observed from the <video> element (never faked).
+  const [realDuration, setRealDuration] = useState<number | null>(null);
+  const [realResolution, setRealResolution] = useState<{ w: number; h: number } | null>(null);
   // Image-preview retry state (video uses VideoPlayer's own retry).
   // MediaResult remounts per result (parent key), so these reset naturally.
   const [imgSrc, setImgSrc] = useState<string | null>(null);
@@ -455,10 +548,19 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
     audioFallbackRef.current = t.result.audioErrorFallback;
   });
 
-  // Never assume media[0] is the playable item: prefer actual video so a
-  // thumbnail listed first can never demote a Reel to a photo.
-  const firstMedia = result.media.find((m) => m.type === "video") ?? result.media[0];
+  const items = result.media;
+  const safeIndex = items.length === 0 ? 0 : Math.min(currentIndex, items.length - 1);
+  const currentMedia = items[safeIndex] ?? null;
   const isAudio = mode === "audio";
+  const showCarouselNav = !isAudio && items.length > 1;
+
+  const resetPerItemState = useCallback(() => {
+    setImgSrc(null);
+    setImgFailed(false);
+    imgRetriedRef.current = false;
+    setRealDuration(null);
+    setRealResolution(null);
+  }, []);
 
   // For audio mode: fetch the MP3 from the backend
   useEffect(() => {
@@ -494,12 +596,15 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   }, [isAudio, result.sourceUrl, audioUrl, audioError]);
 
   const handleDownloadVideo = useCallback(() => {
-    if (!firstMedia || downloading === "preparing") return;
+    if (!currentMedia || downloading === "preparing") return;
     setDownloading("preparing");
     try {
       const safeHandle = sanitizeHandle(result.author?.username);
-      const filename = `${safeHandle}-${firstMedia.type === "video" ? "video" : "photo"}.mp4`;
-      const downloadUrl = getDownloadUrl(firstMedia.url, filename, result.sourceUrl);
+      const ext = extForMedia(currentMedia);
+      const filename = items.length > 1
+        ? `${safeHandle}-${safeIndex + 1}.${ext}`
+        : `${safeHandle}-${currentMedia.type === "video" ? "video" : "photo"}.${ext}`;
+      const downloadUrl = getDownloadUrl(currentMedia.url, filename, result.sourceUrl);
       const a = document.createElement("a");
       a.href = downloadUrl;
       a.rel = "noopener";
@@ -514,7 +619,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
     window.setTimeout(() => {
       setDownloading((s) => (s === "preparing" ? "idle" : s));
     }, 4000);
-  }, [firstMedia, result.author, result.sourceUrl, downloading]);
+  }, [currentMedia, result.author, result.sourceUrl, downloading, items.length, safeIndex]);
 
   const handleDownloadAudio = useCallback(() => {
     if (!audioUrl) return;
@@ -528,7 +633,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   }, [audioUrl, result.author?.username]);
 
   // Media stream URL through our proxy (source allows stale-URL recovery)
-  const streamSrc = firstMedia ? getStreamUrl(firstMedia.url, result.sourceUrl) : "";
+  const streamSrc = currentMedia ? getStreamUrl(currentMedia.url, result.sourceUrl) : "";
 
   const logPreviewDiag = useCallback(
     (mediaType: string | undefined) => {
@@ -549,7 +654,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   // Image preview: retry once with a cache-buster, then show the error state.
   // (The backend already retried with a freshly resolved URL when possible.)
   const handleImgError = useCallback(() => {
-    logPreviewDiag(firstMedia?.type);
+    logPreviewDiag(currentMedia?.type);
     if (!imgRetriedRef.current) {
       imgRetriedRef.current = true;
       const bust = streamSrc.includes("?") ? "&" : "?";
@@ -557,7 +662,19 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
     } else {
       setImgFailed(true);
     }
-  }, [firstMedia, streamSrc, logPreviewDiag]);
+  }, [currentMedia, streamSrc, logPreviewDiag]);
+
+  const goPrev = useCallback(() => {
+    resetPerItemState();
+    setCurrentIndex((i) => Math.max(0, i - 1));
+  }, [resetPerItemState]);
+  const goNext = useCallback(() => {
+    resetPerItemState();
+    setCurrentIndex((i) => Math.min(items.length - 1, i + 1));
+  }, [items.length, resetPerItemState]);
+
+  const effW = realResolution?.w ?? currentMedia?.width ?? null;
+  const effH = realResolution?.h ?? currentMedia?.height ?? null;
 
   // Derived metadata for the new two-column card
   const previewRef = useRef<HTMLDivElement>(null);
@@ -639,15 +756,19 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
                 )}
                 {audioUrl && <AudioPlayer src={audioUrl} />}
               </>
-            ) : !firstMedia ? null : firstMedia.type === "video" ? (
+            ) : !currentMedia ? null : currentMedia.type === "video" ? (
               <VideoPlayer
-                key={firstMedia.url}
+                key={currentMedia.url}
                 src={streamSrc}
-                poster={firstMedia.thumbnail || undefined}
-                mediaType={firstMedia.type}
+                poster={currentMedia.thumbnail || undefined}
+                mediaType={currentMedia.type}
+                width={currentMedia.width}
+                height={currentMedia.height}
+                onDurationChange={(d) => setRealDuration(d)}
+                onResolution={(w, h) => setRealResolution({ w, h })}
               />
             ) : imgFailed ? (
-              <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-black/5">
+              <div className="flex w-full flex-col items-center justify-center gap-2 rounded-[20px] bg-black/5" style={aspectRatioStyle(currentMedia.width, currentMedia.height, "4/3")}>
                 <ImageIcon className="h-10 w-10" style={{ color: "var(--fg-subtle)", opacity: 0.4 }} />
                 <p className="text-xs" style={{ color: "var(--fg-subtle)" }}>
                   {t.result.previewUnavailable}
@@ -656,17 +777,42 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
             ) : (
               // eslint-disable-next-line @next/next/no-img-element -- next/image cannot serve our dynamic backend /api/stream proxy URLs; plain img streams from our own backend exactly like <video> does
               <img
-                key={firstMedia.url}
+                key={currentMedia.url}
                 src={imgSrc ?? streamSrc}
                 alt={result.title ? decodeHtmlEntities(result.title).slice(0, 120) : t.typeBadges.photo}
                 className="media-frame w-full rounded-[20px] object-contain"
-                style={{ background: "#0a0a14", aspectRatio: "4/3" } as React.CSSProperties}
+                style={{ background: "#0a0a14", ...aspectRatioStyle(currentMedia.width, currentMedia.height, "4/3") } as React.CSSProperties}
                 onError={handleImgError}
               />
             )}
+            {showCarouselNav && (
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={goPrev}
+                  disabled={safeIndex === 0}
+                  className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-[12px] border border-border bg-card px-3 text-[13px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Previous media"
+                >
+                  &lt; Previous
+                </button>
+                <span className="shrink-0 px-2 text-[13px] font-bold tabular-nums text-fg-muted" aria-live="polite">
+                  {safeIndex + 1} / {items.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={goNext}
+                  disabled={safeIndex === items.length - 1}
+                  className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-[12px] border border-border bg-card px-3 text-[13px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Next media"
+                >
+                  Next &gt;
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Actions */}
+          {/* Actions + metadata */}
           <div className="result-details flex min-w-0 flex-col gap-3 md:gap-4">
             <div className="result-actions flex flex-col gap-2.5 sm:flex-row">
               <button
@@ -711,6 +857,24 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
                 {t.result.downloadFailed}
               </p>
             )}
+            <dl className="grid grid-cols-2 gap-2 text-[12.5px]">
+              <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                <dt className="font-medium text-fg-subtle">Resolution</dt>
+                <dd className="mt-0.5 font-semibold tabular-nums text-fg">{isAudio ? "—" : formatResolution(effW, effH)}</dd>
+              </div>
+              <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                <dt className="font-medium text-fg-subtle">File Size</dt>
+                <dd className="mt-0.5 font-semibold tabular-nums text-fg">{isAudio ? "MP3 · 192k" : formatBytes(currentMedia?.size)}</dd>
+              </div>
+              <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                <dt className="font-medium text-fg-subtle">Duration</dt>
+                <dd className="mt-0.5 font-semibold tabular-nums text-fg">{isAudio ? "Audio · MP3" : (currentMedia?.type === "video" ? formatMetaDuration(currentMedia?.duration, realDuration) : "—")}</dd>
+              </div>
+              <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                <dt className="font-medium text-fg-subtle">Format</dt>
+                <dd className="mt-0.5 font-semibold text-fg">{isAudio ? "MP3" : (currentMedia ? labelForMedia(currentMedia) : "—")}</dd>
+              </div>
+            </dl>
           </div>
         </div>
       </div>
@@ -723,8 +887,8 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
 // ─── Main Component ───────────────────────────────────────
 
 interface HeroDownloaderProps {
-  activeTab: DownloaderTab;
-  onActiveTabChange: (tab: DownloaderTab) => void;
+  activeTab: DownloaderTab | null;
+  onActiveTabChange: (tab: DownloaderTab | null) => void;
 }
 
 export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDownloaderProps) {
@@ -785,21 +949,23 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
 
   const handleClear = useCallback(() => {
     invalidateRequest();
+    onActiveTabChange(null);
     setUrl("");
     setError("");
     setState("IDLE");
     setResult(null);
     setProgress(0);
     setProgressStage("");
-  }, [invalidateRequest]);
+  }, [invalidateRequest, onActiveTabChange]);
 
   const handleRetry = useCallback(() => {
     invalidateRequest();
+    onActiveTabChange(null);
     setError("");
     setState("IDLE");
     setProgress(0);
     setProgressStage("");
-  }, [invalidateRequest]);
+  }, [invalidateRequest, onActiveTabChange]);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -849,6 +1015,8 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
           closeStream();
           setProgress(100);
           setProgressStage("");
+          const detectedTab = resolveTabFromResultType(data.type);
+          if (detectedTab) onActiveTabChange(detectedTab);
           setResult(data);
           setState("SUCCESS");
         },
@@ -874,6 +1042,8 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                 setState("ERROR");
                 return;
               }
+              const detectedTab = resolveTabFromResultType(data.data.type);
+              if (detectedTab) onActiveTabChange(detectedTab);
               setProgress(100);
               setProgressStage("");
               setResult(data.data);
@@ -891,7 +1061,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
       });
       streamRef.current = handle;
     },
-    [url, t, invalidateRequest, clearWatchdog, closeStream]
+    [url, t, invalidateRequest, clearWatchdog, closeStream, onActiveTabChange]
   );
 
   const isAudioMode = activeTab === "audio";

@@ -18,8 +18,8 @@ function getInitialTheme(): "light" | "dark" {
 }
 
 interface HeaderProps {
-  activeDownloaderTab?: DownloaderTab;
-  onDownloaderTabChange?: (tab: DownloaderTab) => void;
+  activeDownloaderTab?: DownloaderTab | null;
+  onDownloaderTabChange?: (tab: DownloaderTab | null) => void;
 }
 
 export default function Header({ activeDownloaderTab, onDownloaderTabChange }: HeaderProps) {

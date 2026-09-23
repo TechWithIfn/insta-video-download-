@@ -15,18 +15,20 @@ const QUICK_ICONS = [Zap, ShieldCheck, Clock, Smartphone];
 
 export default function Home() {
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<DownloaderTab>("reels");
+  const [activeTab, setActiveTab] = useState<DownloaderTab | null>(null);
 
   useEffect(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
-    if (requestedTab === "reels" || requestedTab === "videos" || requestedTab === "photos" || requestedTab === "audio") {
+    if (requestedTab === "reels" || requestedTab === "videos" || requestedTab === "photos" || requestedTab === "stories" || requestedTab === "highlights" || requestedTab === "audio") {
       queueMicrotask(() => setActiveTab(requestedTab));
     }
   }, []);
 
-  const handleDownloaderTabChange = (tab: DownloaderTab) => {
+  const handleDownloaderTabChange = (tab: DownloaderTab | null) => {
     setActiveTab(tab);
-    document.getElementById("hero")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (tab) {
+      document.getElementById("hero")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   };
 
   return (

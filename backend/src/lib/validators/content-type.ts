@@ -18,7 +18,9 @@ export function isSupportedContent(type: InstagramContentType): boolean {
   const supported: InstagramContentType[] = [
     "REEL",
     "POST",
+    "CAROUSEL",
     "VIDEO",
+    "PHOTO",
     "STORY",
     "HIGHLIGHT",
   ];

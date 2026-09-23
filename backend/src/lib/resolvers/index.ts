@@ -23,6 +23,19 @@ export function resetResolver(): void {
   lastProviderName = null;
 }
 
+/**
+ * Single normalized-type rule shared by all providers: a POST that resolved
+ * to multiple media items is a carousel. Provider responses (and URL hints)
+ * are unreliable here — /p/SHORTCODE/ covers both single photos and
+ * carousels — so the real media count is the source of truth.
+ */
+export function normalizeResultType(result: ResolverResult): ResolverResult {
+  if (result.type === "POST" && result.media.length > 1) {
+    return { ...result, type: "CAROUSEL" };
+  }
+  return result;
+}
+
 export interface ResolveOptions {
   /**
    * Skip the resolve cache read (used for expiry recovery: the cached CDN
@@ -65,7 +78,8 @@ export async function resolveUrl(
       url: url.slice(0, 80),
     });
     onProgress?.(25, "Starting resolution");
-    const result = await resolver.resolve(url, onProgress);
+    const raw = await resolver.resolve(url, onProgress);
+    const result = normalizeResultType(raw);
     setCachedResult(url, result);
     return result;
   })();

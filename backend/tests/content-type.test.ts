@@ -26,6 +26,14 @@ describe("detectContentType", () => {
     expect(detectContentType("/stories/highlights/123456/")).toBe("HIGHLIGHT");
   });
 
+  it("keeps generic post URLs as POST until provider confirms a carousel", () => {
+    expect(detectContentType("/p/Cxyz123/?utm_source=abc")).toBe("POST");
+  });
+
+  it("detects photo URLs", () => {
+    expect(detectContentType("/p/Cxyz123/")).toBe("POST");
+  });
+
   it("returns UNKNOWN for unrecognized paths", () => {
     expect(detectContentType("/explore/")).toBe("UNKNOWN");
   });
@@ -60,11 +68,11 @@ describe("isSupportedContent", () => {
     expect(isSupportedContent("UNKNOWN")).toBe(false);
   });
 
-  it("returns false for CAROUSEL", () => {
-    expect(isSupportedContent("CAROUSEL")).toBe(false);
+  it("returns true for CAROUSEL", () => {
+    expect(isSupportedContent("CAROUSEL")).toBe(true);
   });
 
-  it("returns false for PHOTO", () => {
-    expect(isSupportedContent("PHOTO")).toBe(false);
+  it("returns true for PHOTO", () => {
+    expect(isSupportedContent("PHOTO")).toBe(true);
   });
 });

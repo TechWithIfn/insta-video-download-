@@ -12,13 +12,26 @@ function isInstagramHost(hostname: string): boolean {
 function isAllowedRedirectHost(hostname: string): boolean {
   const h = hostname.toLowerCase();
   if (isPrivateOrReservedHost(h)) return false;
+  if (isMockCdnHost(h)) return true;
   return isCdnMediaHost(h) || isInstagramHost(h);
+}
+
+function isMockCdnHost(hostname: string): boolean {
+  if (hostname.toLowerCase() !== "mock-cdn.example.com") return false;
+  // Dev/test provider only — never a production fallback.
+  return (
+    process.env.RESOLVER_PROVIDER === "mock" ||
+    process.env.NODE_ENV === "test" ||
+    process.env.VITEST === "true" ||
+    process.env.ALLOW_MOCK_CDN === "true"
+  );
 }
 
 export function isAllowedMediaUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "https:") return false;
+    if (isMockCdnHost(parsed.hostname)) return true;
     return isCdnMediaHost(parsed.hostname);
   } catch {
     return false;
