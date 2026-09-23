@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   extractMediaFromJson,
   extractSidecarFromJson,
+  extractSidecarFromEmbedHtml,
   sortVideoFirst,
   fetchMetadata,
 } from "@/lib/providers/puppeteer";
@@ -137,6 +138,49 @@ describe("extractSidecarFromJson", () => {
 
   it("returns an empty page for invalid JSON", () => {
     expect(extractSidecarFromJson("not json{{")).toEqual({ items: [], hasMore: false, endCursor: null });
+  });
+});
+
+describe("extractSidecarFromEmbedHtml", () => {
+  function embedHtml(childCount: number): string {
+    const edges = Array.from({ length: childCount }, (_, i) => ({
+      node: {
+        id: `id-${i + 1}`,
+        shortcode: `CHILD${i + 1}`,
+        is_video: false,
+        display_url: `https://scontent.cdninstagram.com/v/slide${i + 1}.jpg`,
+        dimensions: { width: 1080, height: 1350 },
+      },
+    }));
+    // Embed nests the sidecar one JSON-string level deep with \" escapes.
+    const inner = JSON.stringify({
+      edge_sidecar_to_children: {
+        edges,
+        page_info: { has_next_page: false, end_cursor: null },
+      },
+    }).replace(/"/g, '\\"');
+    return (
+      `<html><body><script>window.__emb=` +
+      JSON.stringify({ gql_data: { shortcode_media: { data: inner } } }) +
+      `;</script></body></html>`
+    );
+  }
+
+  it("returns all 11 children in order from embed HTML", () => {
+    const page = extractSidecarFromEmbedHtml(embedHtml(11));
+    expect(page.items).toHaveLength(11);
+    expect(page.items[0].url).toContain("slide1.jpg");
+    expect(page.items[10].url).toContain("slide11.jpg");
+    expect(page.items[0].width).toBe(1080);
+    expect(page.items[0].height).toBe(1350);
+  });
+
+  it("returns an empty page when no sidecar exists", () => {
+    expect(extractSidecarFromEmbedHtml("<html><body>hello</body></html>")).toEqual({
+      items: [],
+      hasMore: false,
+      endCursor: null,
+    });
   });
 });
 

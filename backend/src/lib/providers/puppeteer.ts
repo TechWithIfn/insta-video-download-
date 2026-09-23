@@ -107,14 +107,17 @@ export interface SidecarPage {
  * are kept as separate image entries, matching the regex path's behavior).
  */
 export function extractSidecarFromJson(text: string): SidecarPage {
-  const empty: SidecarPage = { items: [], hasMore: false, endCursor: null };
   let root: unknown;
   try {
     root = JSON.parse(text);
   } catch {
-    return empty;
+    return { items: [], hasMore: false, endCursor: null };
   }
+  return parseSidecarRoot(root);
+}
 
+/** Walk a parsed Instagram API object for sidecar/carousel children. */
+function parseSidecarRoot(root: unknown): SidecarPage {
   const items: ExtractedMedia[] = [];
   const seen = new Set<string>();
   let hasMore = false;
@@ -234,6 +237,125 @@ export function extractSidecarFromJson(text: string): SidecarPage {
 
   walk(root, 0);
   return { items, hasMore, endCursor };
+}
+
+/** Extract a `{...}` balanced block starting at `openIdx`, honoring `\` escapes. */
+function extractBalancedJson(text: string, openIdx: number, maxLen = 2_000_000): string | null {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = openIdx; i < text.length && i - openIdx < maxLen; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === "\\") {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === "{") {
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth === 0) return text.slice(openIdx, i + 1);
+    }
+  }
+  return null;
+}
+
+/**
+ * Complete carousel extraction from Instagram's public post embed endpoint
+ * (`/p/<shortcode>/embed/`), whose `gql_data.shortcode_media` carries the
+ * FULL `edge_sidecar_to_children` collection (all slides, in order, with
+ * dimensions) — unlike the main page, which only exposes the first slides
+ * anonymously. Tries progressive unescape levels since the blob is embedded
+ * at varying depths; returns an empty page when unusable. Never throws.
+ */
+/** Collect nested JSON-string values that themselves carry sidecar data. */
+function collectSidecarStrings(node: unknown, out: string[], depth = 0): void {
+  if (node == null || depth > 8) return;
+  if (typeof node === "string") {
+    if (node.includes("edge_sidecar_to_children") || node.includes("carousel_media")) {
+      out.push(node);
+    }
+    return;
+  }
+  if (Array.isArray(node)) {
+    for (const el of node) collectSidecarStrings(el, out, depth + 1);
+    return;
+  }
+  if (typeof node === "object") {
+    for (const v of Object.values(node as Record<string, unknown>)) {
+      collectSidecarStrings(v, out, depth + 1);
+    }
+  }
+}
+
+/**
+ * Parse the longest valid JSON prefix: on "Unexpected non-whitespace after
+ * JSON at position N", the input slice [0, N) is complete — retry with it.
+ * Bounded and strictly shrinking, so it always terminates.
+ */
+function tryParseJsonPrefix(text: string): unknown | null {
+  let slice = text;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      return JSON.parse(slice);
+    } catch (e) {
+      const m = /position (\d+)/.exec(e instanceof Error ? e.message : "");
+      if (!m) return null;
+      const pos = parseInt(m[1], 10);
+      if (!(pos > 0) || pos >= slice.length) return null;
+      slice = slice.slice(0, pos);
+    }
+  }
+  return null;
+}
+
+export function extractSidecarFromEmbedHtml(html: string): SidecarPage {
+  const empty: SidecarPage = { items: [], hasMore: false, endCursor: null };
+  try {
+    // &quot; entities would otherwise look like raw quotes to the scanner.
+    const flat = html.replace(/\\\//g, "/").replace(/&quot;/g, '\\"');
+    const anchor = flat.indexOf("gql_data");
+    if (anchor === -1) return empty;
+    const openIdx = flat.indexOf("{", anchor);
+    if (openIdx === -1) return empty;
+    const block = extractBalancedJson(flat, openIdx);
+    if (!block) return empty;
+    // The blob may itself be escape-prefixed ({\"shortcode_media\"...}, i.e.
+    // a JSON string's content rather than a standalone object). Retry the
+    // whole block through progressive unescape levels; at each level also
+    // probe nested JSON-string blobs in both raw and unescaped forms.
+    let candidate: string = block;
+    for (let pass = 0; pass < 3; pass++) {
+      const root: unknown = tryParseJsonPrefix(candidate);
+      if (root) {
+        const direct = parseSidecarRoot(root);
+        if (direct.items.length > 0) return direct;
+        const nested: string[] = [];
+        collectSidecarStrings(root, nested);
+        for (const s of nested.slice(0, 4)) {
+          for (const form of [s, s.replace(/\\"/g, '"')]) {
+            const sub = tryParseJsonPrefix(form);
+            if (sub) {
+              const page = parseSidecarRoot(sub);
+              if (page.items.length > 0) return page;
+            }
+          }
+        }
+      }
+      candidate = candidate.replace(/\\"/g, '"');
+    }
+    return empty;
+  } catch {
+    return empty;
+  }
 }
 
 function extractMediaFromHtml(html: string): ExtractedMedia[] {
@@ -826,6 +948,73 @@ export class PuppeteerProvider extends BaseProvider {
         timings.totalMs = Date.now() - startTime;
         logger.info("[resolve] fast path complete", { ...timings, mediaCount: 1 });
         return result;
+      }
+
+      // Post fast path: the public embed endpoint carries the COMPLETE
+      // sidecar collection (every slide, in order, with dimensions), unlike
+      // the main page which only exposes the first slides anonymously. When
+      // it yields items, the browser pass is skipped entirely.
+      if (url.includes("/p/")) {
+        const postMatch = /instagram\.com\/p\/([A-Za-z0-9_-]+)/.exec(url);
+        if (postMatch?.[1]) {
+          const embedStart = Date.now();
+          const embedHtml = await fetchPageHtml(
+            `https://www.instagram.com/p/${postMatch[1]}/embed/`
+          );
+          timings.embedMs = Date.now() - embedStart;
+          const embed = embedHtml ? extractSidecarFromEmbedHtml(embedHtml) : null;
+          if (embed && embed.items.length > 0) {
+            const validEmbed: MediaItem[] = [];
+            for (const item of embed.items) {
+              if (this.validateMediaUrl(item.url)) {
+                validEmbed.push({
+                  url: item.url,
+                  type: item.type,
+                  width: item.width,
+                  height: item.height,
+                  duration: null,
+                  thumbnail: null,
+                  format: item.type === "video" ? "mp4" : null,
+                });
+              }
+            }
+            if (validEmbed.length > 0) {
+              const author =
+                fetchMeta.author ||
+                extractAuthorFromUrl(url);
+              const rawTitle = fetchMeta.title || fetchMeta.description;
+              const decodedAuthor: Author | null = author
+                ? {
+                    username: author.username,
+                    displayName: author.displayName
+                      ? decodeHtmlEntities(author.displayName)
+                      : null,
+                  }
+                : null;
+              logger.info("Puppeteer resolve via embed sidecar (no browser)", {
+                contentType: this.detectContentType(url),
+                mediaCount: validEmbed.length,
+                hasVideo: validEmbed.some((m) => m.type === "video"),
+              });
+              timings.totalMs = Date.now() - startTime;
+              onProgress?.(85, "Media extracted");
+              return {
+                type: this.detectContentType(url),
+                sourceUrl: url,
+                thumbnail:
+                  validEmbed.find((m) => m.type === "image")?.url ||
+                  fetchMeta.ogImage ||
+                  null,
+                title: rawTitle ? decodeHtmlEntities(rawTitle) : null,
+                author: decodedAuthor,
+                media: validEmbed,
+              };
+            }
+            logger.info("Embed sidecar had no valid media, continuing to browser", {
+              discovered: embed.items.length,
+            });
+          }
+        }
       }
 
       if (!(await this.acquirePageSlot())) {
