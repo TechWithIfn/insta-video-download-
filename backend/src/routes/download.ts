@@ -27,7 +27,9 @@ function sanitizeDownloadFilename(raw: unknown, contentType: string): string {
   // Enforce the extension from the VERIFIED upstream content type.
   const ct = contentType.toLowerCase();
   let ext = ".mp4";
-  if (ct.includes("image/png")) ext = ".png";
+  if (ct.includes("audio/mpeg") || ct.includes("audio/mp3")) ext = ".mp3";
+  else if (ct.includes("audio/mp4") || ct.includes("audio/x-m4a")) ext = ".m4a";
+  else if (ct.includes("image/png")) ext = ".png";
   else if (ct.includes("image/webp")) ext = ".webp";
   else if (ct.includes("image/jpeg") || ct.includes("image/jpg")) ext = ".jpg";
   return base + ext;
@@ -131,7 +133,10 @@ router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
     }
 
     const isMediaCT =
-      upstreamCT.includes("video") || upstreamCT.includes("image") || upstreamCT.includes("octet-stream");
+      upstreamCT.includes("video") ||
+      upstreamCT.includes("image") ||
+      upstreamCT.includes("audio") ||
+      upstreamCT.includes("octet-stream");
     if (upstreamCT && !isMediaCT) {
       await response.body?.cancel().catch(() => {});
       logger.warn("[DOWNLOAD] rejected unexpected content type", { requestId, contentType: upstreamCT });
@@ -148,7 +153,9 @@ router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
     }
 
     const filename = sanitizeDownloadFilename(req.query.filename, upstreamCT);
-    const isVideo = upstreamCT.includes("video") || !upstreamCT.includes("image");
+    const isVideo =
+      upstreamCT.includes("video") ||
+      (!upstreamCT.includes("image") && !upstreamCT.includes("audio"));
 
     res.setHeader("Content-Type", isVideo ? "video/mp4" : upstreamCT || "application/octet-stream");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);

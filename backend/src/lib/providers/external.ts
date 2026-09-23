@@ -113,9 +113,11 @@ export class ExternalProvider extends BaseProvider {
         if (!item.url || typeof item.url !== "string") continue;
         if (!this.validateMediaUrl(item.url)) continue;
 
+        const mediaType = item.type === "video" || item.type === "audio" ? item.type : "image";
+
         media.push({
           url: item.url,
-          type: item.type === "video" ? "video" : "image",
+          type: mediaType,
           width: typeof item.width === "number" ? item.width : null,
           height: typeof item.height === "number" ? item.height : null,
           duration:
@@ -125,7 +127,14 @@ export class ExternalProvider extends BaseProvider {
             typeof item.thumbnail === "string" && this.validateMediaUrl(item.thumbnail)
               ? item.thumbnail
               : null,
-          format: typeof item.format === "string" ? item.format : null,
+          format:
+            typeof item.format === "string"
+              ? item.format
+              : mediaType === "audio"
+                ? "mp3"
+                : mediaType === "video"
+                  ? "mp4"
+                  : null,
         });
       }
     }

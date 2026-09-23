@@ -652,7 +652,23 @@ async function fetchPageSnapshot(url: string, timeoutMs = 10_000): Promise<PageF
       await res.body?.cancel().catch(() => {});
       return { ...base, html: null };
     }
-    return { ...base, html: await res.text() };
+    let bodyTimer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const bodyTimeout = new Promise<never>((_, reject) => {
+        bodyTimer = setTimeout(() => reject(new Error("page-body-timeout")), timeoutMs);
+      });
+      const html = await Promise.race([res.text(), bodyTimeout]);
+      return { ...base, html };
+    } catch (error) {
+      await res.body?.cancel().catch(() => {});
+      return {
+        ...base,
+        html: null,
+        error: error instanceof Error ? error.name : "page-body-failed",
+      };
+    } finally {
+      if (bodyTimer) clearTimeout(bodyTimer);
+    }
   } catch (error) {
     return {
       html: null,
@@ -672,6 +688,15 @@ export async function fetchPageHtml(url: string, timeoutMs = 10_000): Promise<st
 function isLikelyProfileImageUrl(url: string): boolean {
   try {
     return /\/t51\.[^/]+-19\//i.test(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+}
+
+function isLikelyStaticInstagramAssetUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.toLowerCase() === "static.cdninstagram.com" || parsed.pathname.startsWith("/rsrc.php");
   } catch {
     return false;
   }
@@ -778,7 +803,9 @@ export async function fetchMetadata(url: string): Promise<{
 }
 
 const SIDECAR_PAGE_TIMEOUT_MS = 8_000;
-const SIDECAR_MAX_EXTRA_PAGES = 3;
+// Keep following pagination until Instagram says the collection is complete;
+// the ceiling is only a defensive guard against a malformed cursor loop.
+const SIDECAR_MAX_EXTRA_PAGES = 100;
 
 /**
  * Follow a sidecar `end_cursor` with a plain-HTTP request against the same API
@@ -1033,7 +1060,9 @@ export class PuppeteerProvider extends BaseProvider {
             url: fetchMeta.ogImage,
             type: "image" as const,
           }) ||
-          fetchMeta.embeddedMedia.find((item) => item.type === "image");
+          fetchMeta.embeddedMedia.find(
+            (item) => item.type === "image" && !isLikelyProfileImageUrl(item.url)
+          );
         if (storyCandidate && this.validateMediaUrl(storyCandidate.url)) {
           logger.info("Puppeteer story fast path", {
             storyUrl: url,
@@ -1270,8 +1299,14 @@ export class PuppeteerProvider extends BaseProvider {
                 if (sidecar.hasMore && sidecar.endCursor) {
                   sidecarState.page = { url: resUrl, endCursor: sidecar.endCursor };
                 }
+                let responseHost: string | null = null;
+                try {
+                  responseHost = new URL(resUrl).hostname;
+                } catch {
+                  responseHost = null;
+                }
                 logger.debug("Intercepted media from API", {
-                  url: resUrl.slice(0, 100),
+                  host: responseHost,
                   count: media.length,
                 });
               }
@@ -1292,6 +1327,7 @@ export class PuppeteerProvider extends BaseProvider {
             const looksLikeMedia =
               resourceType === "media" ||
               ctLower.startsWith("video/") ||
+              (ctLower.startsWith("image/") && isTrustedCdnUrl(resUrl) && !isLikelyStaticInstagramAssetUrl(resUrl)) ||
               (ctLower.includes("octet-stream") && /fbcdn|cdninstagram|scontent/i.test(resUrl));
             if (looksLikeMedia) {
               let host: string | null = null;
@@ -1429,12 +1465,12 @@ export class PuppeteerProvider extends BaseProvider {
       // Carousel expansion: post slides beyond the first lazy-load as the
       // user advances, so a single DOM snapshot undercounts multi-image
       // posts. For /p/ URLs, click the carousel "Next" control (bounded:
-      // max 10 advances, stop after 2 consecutive advances with no new
-      // media) and accumulate every newly exposed image/video URL.
+      // stop after the carousel reports no next control or two consecutive
+      // advances with no new media, and accumulate every exposed item.
       if (url.includes("/p/")) {
         const seenDom = new Set<string>([...domResult.videos, ...domResult.images]);
         let quietClicks = 0;
-        for (let step = 0; step < 10 && quietClicks < 2; step++) {
+        for (let step = 0; step < 100 && quietClicks < 2; step++) {
           let clicked = false;
           try {
             clicked = await page.evaluate(
@@ -1548,6 +1584,7 @@ export class PuppeteerProvider extends BaseProvider {
       const seenUrls = new Set<string>();
 
       const addUnique = (item: ExtractedMedia) => {
+        if (isStory && isLikelyStaticInstagramAssetUrl(item.url)) return;
         if (isStory && item.type === "image" && isLikelyProfileImageUrl(item.url)) return;
         if (!seenUrls.has(item.url)) {
           seenUrls.add(item.url);

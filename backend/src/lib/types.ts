@@ -137,7 +137,7 @@ export interface ExternalProviderResponse {
     thumbnail?: string;
     media?: Array<{
       url: string;
-      type?: string;
+      type?: "image" | "video" | "audio" | string;
       width?: number;
       height?: number;
       duration?: number;

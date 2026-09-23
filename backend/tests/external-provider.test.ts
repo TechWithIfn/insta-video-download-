@@ -119,6 +119,29 @@ describe("ExternalProvider", () => {
     expect(result.media[2].type).toBe("image");
   });
 
+  it("preserves a direct authorized audio source", async () => {
+    global.fetch = mockFetch({
+      success: true,
+      data: {
+        type: "AUDIO",
+        media: [{ url: "https://audio.example.com/source.m4a", type: "audio", duration: 12.5 }],
+      },
+    });
+
+    const provider = new ExternalProvider(
+      "https://api.example.com/resolve",
+      "test-key"
+    );
+    const result = await provider.resolve(
+      "https://www.instagram.com/reels/audio/123456789/"
+    );
+
+    expect(result.type).toBe("AUDIO");
+    expect(result.media[0].type).toBe("audio");
+    expect(result.media[0].format).toBe("mp3");
+    expect(result.media[0].duration).toBe(12.5);
+  });
+
   it("rejects unsafe media URLs (localhost)", async () => {
     global.fetch = mockFetch({
       success: true,

@@ -970,6 +970,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
   // events. Never advanced by timers.
   const [progress, setProgress] = useState(0);
   const [progressStage, setProgressStage] = useState("");
+  const [audioExtractionRequested, setAudioExtractionRequested] = useState(false);
   const streamRef = useRef<ResolveStreamHandle | null>(null);
   const requestSeqRef = useRef(0);
   const watchdogRef = useRef<number | null>(null);
@@ -1021,6 +1022,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
     setError("");
     setState("IDLE");
     setResult(null);
+    setAudioExtractionRequested(false);
     setProgress(0);
     setProgressStage("");
   }, [invalidateRequest, onActiveTabChange]);
@@ -1030,6 +1032,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
     onActiveTabChange(null);
     setError("");
     setState("IDLE");
+    setAudioExtractionRequested(false);
     setProgress(0);
     setProgressStage("");
   }, [invalidateRequest, onActiveTabChange]);
@@ -1051,10 +1054,9 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
       // Single active request: supersede anything still in flight so rapid
       // clicks can never spawn parallel resolutions.
       invalidateRequest();
-      // If the user explicitly chose the Audio tab before submitting, keep it:
-      // auto-detection must not flip Audio mode back to Reels/Photos, or the
-      // MP3 extraction flow would never run.
-      const submittedInAudioMode = activeTab === "audio";
+      // Audio is an output preference, not an input type selector. Preserve
+      // it for Reel/Video -> MP3 while still updating the detected source tab.
+      setAudioExtractionRequested(activeTab === "audio");
       const seq = ++requestSeqRef.current;
       setResult(null);
       setError("");
@@ -1086,10 +1088,8 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
           closeStream();
           setProgress(100);
           setProgressStage("");
-          if (!submittedInAudioMode) {
-            const detectedTab = resolveTabFromResultType(data.type);
-            if (detectedTab) onActiveTabChange(detectedTab);
-          }
+          const detectedTab = resolveTabFromResultType(data.type);
+          if (detectedTab) onActiveTabChange(detectedTab);
           setResult(data);
           setState("SUCCESS");
         },
@@ -1115,10 +1115,8 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                 setState("ERROR");
                 return;
               }
-              if (!submittedInAudioMode) {
-                const detectedTab = resolveTabFromResultType(data.data.type);
-                if (detectedTab) onActiveTabChange(detectedTab);
-              }
+              const detectedTab = resolveTabFromResultType(data.data.type);
+              if (detectedTab) onActiveTabChange(detectedTab);
               setProgress(100);
               setProgressStage("");
               setResult(data.data);
@@ -1139,7 +1137,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
     [url, t, activeTab, invalidateRequest, clearWatchdog, closeStream, onActiveTabChange]
   );
 
-  const isAudioMode = activeTab === "audio";
+  const isAudioMode = activeTab === "audio" || (audioExtractionRequested && state === "SUCCESS");
 
   const tabsRef = useRef<HTMLDivElement>(null);
   const resultAnchorRef = useRef<HTMLDivElement>(null);

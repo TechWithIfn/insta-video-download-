@@ -13,7 +13,9 @@ describe("Download query-param validation", () => {
     if (!base) base = "downloadit-media";
     const ct = contentType.toLowerCase();
     let ext = ".mp4";
-    if (ct.includes("image/png")) ext = ".png";
+    if (ct.includes("audio/mpeg") || ct.includes("audio/mp3")) ext = ".mp3";
+    else if (ct.includes("audio/mp4") || ct.includes("audio/x-m4a")) ext = ".m4a";
+    else if (ct.includes("image/png")) ext = ".png";
     else if (ct.includes("image/webp")) ext = ".webp";
     else if (ct.includes("image/jpeg") || ct.includes("image/jpg")) ext = ".jpg";
     return base + ext;
@@ -23,6 +25,8 @@ describe("Download query-param validation", () => {
     expect(sanitizeDownloadFilename("creator-video", "video/mp4")).toBe("creator-video.mp4");
     expect(sanitizeDownloadFilename("creator-video.mp4", "image/jpeg")).toBe("creator-video.jpg");
     expect(sanitizeDownloadFilename("pic", "image/png")).toBe("pic.png");
+    expect(sanitizeDownloadFilename("track", "audio/mpeg")).toBe("track.mp3");
+    expect(sanitizeDownloadFilename("track", "audio/mp4")).toBe("track.m4a");
   });
 
   it("strips path traversal and dangerous characters", () => {
