@@ -171,6 +171,20 @@ router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
     const videoItem = result.media.find((m) => m.type === "video" && m.url && typeof m.url === "string");
     if (!videoItem) {
       logger.warn("[AUDIO] no usable video found", { requestId });
+      // An audio page with no resolvable source clip must get a clear audio
+      // error — never the confusing "no video in this post" message.
+      const audioPage = result.type === "AUDIO" || validation.parsed.contentType === "AUDIO";
+      if (audioPage) {
+        res.status(502).json({
+          success: false,
+          error: {
+            code: "AUDIO_UNAVAILABLE" as ErrorCode,
+            message:
+              "Could not resolve an accessible audio source for this audio link. Instagram may be restricting access right now — please try again shortly.",
+          },
+        });
+        return;
+      }
       res.status(400).json({
         success: false,
         error: {

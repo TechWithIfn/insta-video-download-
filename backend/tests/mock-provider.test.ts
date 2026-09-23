@@ -105,6 +105,15 @@ describe("MockProvider", () => {
     }
   });
 
+  it("resolves an audio page URL as AUDIO with a source video", async () => {
+    const result = await provider.resolve(
+      "https://www.instagram.com/reels/audio/409293986509384/"
+    );
+    expect(result.type).toBe("AUDIO");
+    expect(result.media.length).toBe(1);
+    expect(result.media[0].type).toBe("video");
+  });
+
   it("returns author information", async () => {
     const result = await provider.resolve(
       "https://www.instagram.com/p/Cxyz123/"

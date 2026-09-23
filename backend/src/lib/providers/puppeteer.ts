@@ -875,9 +875,10 @@ export class PuppeteerProvider extends BaseProvider {
 
       // Also try to extract from rendered HTML
       let renderedHtmlMedia: ExtractedMedia[] = [];
+      let renderedHtmlText = "";
       try {
-        const renderedHtml = await page.content();
-        renderedHtmlMedia = extractMediaFromHtml(renderedHtml);
+        renderedHtmlText = await page.content();
+        renderedHtmlMedia = extractMediaFromHtml(renderedHtmlText);
       } catch {
         // Page content not available
       }
@@ -956,6 +957,13 @@ export class PuppeteerProvider extends BaseProvider {
         // a fake photo result — surface an honest diagnostic error instead.
         const noVideoKind = this.detectContentType(url);
         if (noVideoKind === "AUDIO") {
+          // Audio pages often link the clips using the sound instead of
+          // embedding a playable video: try those before giving up.
+          const clip = await this.tryResolveAudioClip(url, renderedHtmlText, fetchMeta);
+          if (clip) {
+            onProgress?.(85, "Audio source found");
+            return clip;
+          }
           throw createError("AUDIO_UNAVAILABLE");
         }
         if (noVideoKind === "REEL" || noVideoKind === "VIDEO") {
@@ -968,6 +976,19 @@ export class PuppeteerProvider extends BaseProvider {
       }
 
       const contentType = this.detectContentType(url);
+
+      // An audio page whose media is only cover art (no playable video) must
+      // never masquerade as a result: look for a linked clip first, then fail
+      // honestly so the audio route never reports a confusing "no video".
+      if (contentType === "AUDIO" && !validMedia.some((m) => m.type === "video")) {
+        const clip = await this.tryResolveAudioClip(url, renderedHtmlText, fetchMeta);
+        if (clip) {
+          onProgress?.(85, "Audio source found");
+          return clip;
+        }
+        throw createError("AUDIO_UNAVAILABLE");
+      }
+
       const orderedMedia = sortVideoFirst(validMedia, contentType);
 
       const author =
@@ -1029,11 +1050,84 @@ export class PuppeteerProvider extends BaseProvider {
     }
   }
 
+  /**
+   * Audio-page recovery: `/reels/audio/<id>/` pages frequently contain no
+   * playable video themselves but link clips using the sound. Scan the
+   * rendered page for up to 2 linked reel/post shortcodes and probe each with
+   * a cheap plain-HTTP metadata fetch (no extra browser work). Returns an
+   * AUDIO result backed by the first clip with a trusted playable video, or
+   * null when no accessible source exists. Never throws.
+   */
+  private async tryResolveAudioClip(
+    url: string,
+    renderedHtml: string,
+    meta: { ogImage: string | null; title: string | null; description: string | null; author: Author | null }
+  ): Promise<ResolverResult | null> {
+    const codes: string[] = [];
+    const seen = new Set<string>();
+    try {
+      const re = /\/(?:reel|reels|p)\/([A-Za-z0-9_-]{5,30})\/?/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(renderedHtml)) !== null && codes.length < 2) {
+        const code = m[1];
+        if (!seen.has(code) && code !== "audio") {
+          seen.add(code);
+          codes.push(code);
+        }
+      }
+    } catch {
+      return null;
+    }
+
+    for (const code of codes) {
+      try {
+        const clipMeta = await fetchMetadata(`https://www.instagram.com/reel/${code}/`);
+        if (!clipMeta.ogVideo || clipMeta.loginWall) continue;
+        const author = meta.author || clipMeta.author || extractAuthorFromUrl(url);
+        const decodedAuthor: Author | null = author
+          ? {
+              username: author.username,
+              displayName: author.displayName ? decodeHtmlEntities(author.displayName) : null,
+            }
+          : null;
+        const rawTitle = meta.title || meta.description || clipMeta.title || clipMeta.description;
+        logger.info("Puppeteer audio page resolved via linked clip", { code: code.slice(0, 12) });
+        return {
+          type: "AUDIO",
+          sourceUrl: url,
+          thumbnail: clipMeta.ogImage || meta.ogImage,
+          title: rawTitle ? decodeHtmlEntities(rawTitle) : null,
+          author: decodedAuthor,
+          media: [
+            {
+              url: clipMeta.ogVideo,
+              type: "video",
+              width: null,
+              height: null,
+              duration: null,
+              thumbnail: clipMeta.ogImage || meta.ogImage,
+              format: "mp4",
+            },
+          ],
+        };
+      } catch {
+        // Try the next candidate clip.
+      }
+    }
+    return null;
+  }
+
   private buildResultFromMetadata(
     url: string,
     meta: { ogImage: string | null; title: string | null; description: string | null; author: Author | null }
   ): ResolverResult {
     const contentType = this.detectContentType(url);
+    if (contentType === "AUDIO") {
+      // Cover art alone is not an audio result: the audio route could only
+      // fail downstream with a confusing "no video" message. Fail honestly
+      // here so callers get a clear audio error instead.
+      throw createError("AUDIO_UNAVAILABLE");
+    }
     const author = meta.author || extractAuthorFromUrl(url);
 
     const decodedAuthor: Author | null = author

@@ -15,6 +15,8 @@ import {
   Clock,
   Star,
   Music,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   resolveInstagramUrl,
@@ -355,7 +357,7 @@ function VideoPlayer({ src, poster, mediaType, width, height, onDurationChange, 
 
 // ─── Audio Player ─────────────────────────────────────────
 
-function AudioPlayer({ src }: { src: string }) {
+function AudioPlayer({ src, onDurationChange }: { src: string; onDurationChange?: (duration: number) => void }) {
   const { t } = useLanguage();
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
@@ -369,7 +371,11 @@ function AudioPlayer({ src }: { src: string }) {
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onTime = () => setCurrent(a.currentTime);
-    const onMeta = () => setDuration(a.duration);
+    const onMeta = () => {
+      const nextDuration = Number.isFinite(a.duration) && a.duration >= 0 ? a.duration : 0;
+      setDuration(nextDuration);
+      onDurationChange?.(nextDuration);
+    };
     const onEnd = () => { setPlaying(false); setCurrent(0); };
     a.addEventListener("play", onPlay);
     a.addEventListener("pause", onPause);
@@ -383,6 +389,9 @@ function AudioPlayer({ src }: { src: string }) {
       a.removeEventListener("loadedmetadata", onMeta);
       a.removeEventListener("ended", onEnd);
     };
+    // onDurationChange is a stable parent setter; re-subscribing on each
+    // render would churn listeners for no benefit (same as VideoPlayer).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -531,6 +540,10 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioLoading, setAudioLoading] = useState(true);
   const [audioError, setAudioError] = useState<string | null>(null);
+  // Real MP3 metadata: byte size from the downloaded blob, duration from the
+  // audio element. Shown in the details tiles — never hardcoded.
+  const [audioSize, setAudioSize] = useState<number | null>(null);
+  const [audioDuration, setAudioDuration] = useState<number | null>(null);
   // Carousel / highlight navigation: one item visible at a time.
   const [currentIndex, setCurrentIndex] = useState(0);
   // Long captions are clamped with a Show more/less toggle.
@@ -589,6 +602,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
           throw new Error(body?.error?.message || fallback);
         }
         const blob = await res.blob();
+        if (Number.isFinite(blob.size) && blob.size > 0) setAudioSize(blob.size);
         setAudioUrl(URL.createObjectURL(blob));
       })
       .catch((err) => {
@@ -756,6 +770,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
         <div className="result-grid grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,1fr)] lg:gap-6">
           {/* LEFT: large preview */}
           <div ref={previewRef} className="result-video-wrap min-w-0">
+            <div className="relative">
             {isAudio ? (
               <>
                 {audioLoading && (
@@ -776,7 +791,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
                     <p className="break-words px-4 text-center text-xs text-danger">{audioError}</p>
                   </div>
                 )}
-                {audioUrl && <AudioPlayer src={audioUrl} />}
+                {audioUrl && <AudioPlayer src={audioUrl} onDurationChange={(d) => setAudioDuration(d)} />}
               </>
             ) : !currentMedia ? null : currentMedia.type === "video" ? (
               <VideoPlayer
@@ -809,6 +824,38 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
                 style={{ background: "#0a0a14", aspectRatio: "auto", height: "auto", display: "block" } as React.CSSProperties}
                 onError={handleImgError}
               />
+            )}
+              {/* Overlay carousel arrows: vertically centered on the media
+                  edges, visible without covering important content. */}
+              {showCarouselNav && currentMedia && (
+                <>
+                  <button
+                    type="button"
+                    onClick={goPrev}
+                    disabled={safeIndex === 0}
+                    aria-label="Previous image"
+                    className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-white backdrop-blur-md transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
+                    style={{ background: "rgba(10,10,20,0.55)", border: "1px solid rgba(255,255,255,0.25)" }}
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    disabled={safeIndex === items.length - 1}
+                    aria-label="Next image"
+                    className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-white backdrop-blur-md transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
+                    style={{ background: "rgba(10,10,20,0.55)", border: "1px solid rgba(255,255,255,0.25)" }}
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </>
+              )}
+            </div>
+            {showCarouselNav && currentMedia && (
+              <p className="mt-1.5 text-center text-[12px] font-bold tabular-nums text-fg-subtle" aria-live="polite">
+                {safeIndex + 1} / {items.length}
+              </p>
             )}
           </div>
 
@@ -866,12 +913,12 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
               )}
               <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
                 <dt className="font-medium text-fg-subtle">File Size</dt>
-                <dd className="mt-0.5 font-semibold tabular-nums text-fg">{isAudio ? "MP3 · 192k" : formatBytes(currentMedia?.size)}</dd>
+                <dd className="mt-0.5 font-semibold tabular-nums text-fg">{isAudio ? (audioSize !== null ? formatBytes(audioSize) : "MP3 · 192k") : formatBytes(currentMedia?.size)}</dd>
               </div>
               {(isAudio || currentMedia?.type === "video") && (
                 <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
                   <dt className="font-medium text-fg-subtle">Duration</dt>
-                  <dd className="mt-0.5 font-semibold tabular-nums text-fg">{isAudio ? "Audio · MP3" : formatMetaDuration(currentMedia?.duration, realDuration)}</dd>
+                  <dd className="mt-0.5 font-semibold tabular-nums text-fg">{isAudio ? (audioDuration !== null && audioDuration > 0 ? formatTime(audioDuration) : "Audio · MP3") : formatMetaDuration(currentMedia?.duration, realDuration)}</dd>
                 </div>
               )}
               <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
@@ -882,32 +929,6 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
           </div>
         </div>
 
-        {/* Carousel navigation sits last and ONLY for real carousel posts. */}
-        {showCarouselNav && (
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={goPrev}
-              disabled={safeIndex === 0}
-              className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-[12px] border border-border bg-card px-3 text-[13px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Previous media"
-            >
-              &lt; Previous
-            </button>
-            <span className="shrink-0 px-2 text-[13px] font-bold tabular-nums text-fg-muted" aria-live="polite">
-              {safeIndex + 1} / {items.length}
-            </span>
-            <button
-              type="button"
-              onClick={goNext}
-              disabled={safeIndex === items.length - 1}
-              className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-[12px] border border-border bg-card px-3 text-[13px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Next media"
-            >
-              Next &gt;
-            </button>
-          </div>
-        )}
       </div>
 
       <p className="mt-4 break-words px-2 text-center text-[12px] text-fg-subtle sm:text-[12.5px]">{t.result.tempNote}</p>
