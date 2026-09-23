@@ -16,7 +16,7 @@ export interface Author {
 
 export interface MediaItem {
   url: string;
-  type: "image" | "video";
+  type: "image" | "video" | "audio";
   width: number | null;
   height: number | null;
   duration: number | null;
@@ -33,6 +33,8 @@ export interface ResolvedMedia {
   author: Author | null;
   media: MediaItem[];
   mediaId?: string;
+  /** 0-based carousel start slide from `?img_index=` (null when absent). */
+  startIndex: number | null;
 }
 
 export interface ResolveRequest {
@@ -66,6 +68,7 @@ export type ErrorCode =
   | "UPSTREAM_NOT_FOUND"
   | "UNSUPPORTED_CONTENT"
   | "RESOLVER_ERROR"
+  | "AUDIO_NO_SOURCE"
   | "RESOLVER_TIMEOUT"
   | "RESOLVER_FAILED"
   | "AUDIO_UNAVAILABLE"

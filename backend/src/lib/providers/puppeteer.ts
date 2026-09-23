@@ -91,6 +91,151 @@ export function extractMediaFromJson(text: string): ExtractedMedia[] {
   return media;
 }
 
+export interface SidecarPage {
+  items: ExtractedMedia[];
+  hasMore: boolean;
+  endCursor: string | null;
+}
+
+/**
+ * Structured carousel extraction: parse Instagram API JSON (`edge_sidecar_to_children`
+ * edges or `carousel_media` children) instead of regex-scraping URLs. Returns
+ * every child in order with real per-slide dimensions, plus pagination state
+ * (`page_info.has_next_page` / `end_cursor`) so callers can follow the cursor
+ * until the complete collection is retrieved. Never throws; unparseable input
+ * yields an empty page. Video slides contribute their playable URL (posters
+ * are kept as separate image entries, matching the regex path's behavior).
+ */
+export function extractSidecarFromJson(text: string): SidecarPage {
+  const empty: SidecarPage = { items: [], hasMore: false, endCursor: null };
+  let root: unknown;
+  try {
+    root = JSON.parse(text);
+  } catch {
+    return empty;
+  }
+
+  const items: ExtractedMedia[] = [];
+  const seen = new Set<string>();
+  let hasMore = false;
+  let endCursor: string | null = null;
+
+  const push = (url: unknown, type: "video" | "image", w: unknown, h: unknown): void => {
+    if (typeof url !== "string") return;
+    const clean = unescapeInstagramString(url);
+    if (!clean.startsWith("http") || seen.has(clean)) return;
+    seen.add(clean);
+    items.push({
+      url: clean,
+      type,
+      width: typeof w === "number" && w > 0 ? w : null,
+      height: typeof h === "number" && h > 0 ? h : null,
+    });
+  };
+
+  const visitEdgeNode = (node: unknown): void => {
+    if (!node || typeof node !== "object") return;
+    const n = node as Record<string, unknown>;
+    const dims = n["dimensions"];
+    const w = dims && typeof dims === "object" ? (dims as Record<string, unknown>)["width"] : n["width"];
+    const h = dims && typeof dims === "object" ? (dims as Record<string, unknown>)["height"] : n["height"];
+    if (n["is_video"] === true && typeof n["video_url"] === "string") {
+      push(n["video_url"], "video", w, h);
+    }
+    push(n["display_url"] ?? n["display_src"], "image", w, h);
+  };
+
+  const bestByArea = (cands: unknown[]): Record<string, unknown> | null => {
+    let best: Record<string, unknown> | null = null;
+    let bestArea = -1;
+    for (const cd of cands) {
+      if (!cd || typeof cd !== "object") continue;
+      const cc = cd as Record<string, unknown>;
+      if (typeof cc["url"] !== "string") continue;
+      const area =
+        typeof cc["width"] === "number" && typeof cc["height"] === "number"
+          ? (cc["width"] as number) * (cc["height"] as number)
+          : 0;
+      if (area > bestArea) {
+        bestArea = area;
+        best = cc;
+      }
+    }
+    return best;
+  };
+
+  const visitCarouselChild = (child: unknown): void => {
+    if (!child || typeof child !== "object") return;
+    const c = child as Record<string, unknown>;
+    const vids = c["video_versions"];
+    if (Array.isArray(vids) && vids.length > 0) {
+      const best = bestByArea(vids);
+      if (best) {
+        push(best["url"], "video", best["width"], best["height"]);
+        push(c["display_url"] ?? c["display_src"], "image", best["width"], best["height"]);
+        return;
+      }
+    }
+    const iv2 = c["image_versions2"];
+    const cands =
+      iv2 && typeof iv2 === "object" && Array.isArray((iv2 as Record<string, unknown>)["candidates"])
+        ? ((iv2 as Record<string, unknown>)["candidates"] as unknown[])
+        : [];
+    const best = bestByArea(cands);
+    if (best) {
+      push(best["url"], "image", best["width"], best["height"]);
+    } else {
+      push(c["display_url"] ?? c["display_src"], "image", c["width"], c["height"]);
+    }
+  };
+
+  const walk = (node: unknown, depth: number): void => {
+    if (!node || typeof node !== "object" || depth > 14) return;
+    if (Array.isArray(node)) {
+      for (const el of node) walk(el, depth + 1);
+      return;
+    }
+    const rec = node as Record<string, unknown>;
+    const sidecar = rec["edge_sidecar_to_children"];
+    if (sidecar && typeof sidecar === "object" && !Array.isArray(sidecar)) {
+      const sc = sidecar as Record<string, unknown>;
+      if (Array.isArray(sc["edges"])) {
+        for (const e of sc["edges"] as unknown[]) {
+          const en = (e as Record<string, unknown> | null)?.["node"];
+          visitEdgeNode(en);
+        }
+      }
+      const pi = sc["page_info"];
+      if (pi && typeof pi === "object" && !Array.isArray(pi)) {
+        const pir = pi as Record<string, unknown>;
+        if (pir["has_next_page"] === true) {
+          hasMore = true;
+          if (typeof pir["end_cursor"] === "string" && pir["end_cursor"]) {
+            endCursor = pir["end_cursor"] as string;
+          }
+        }
+      }
+      for (const [k, v] of Object.entries(rec)) {
+        if (k === "edge_sidecar_to_children" || k === "carousel_media") continue;
+        walk(v, depth + 1);
+      }
+      return;
+    }
+    if (Array.isArray(rec["carousel_media"])) {
+      for (const child of rec["carousel_media"] as unknown[]) visitCarouselChild(child);
+      for (const [k, v] of Object.entries(rec)) {
+        if (k === "carousel_media" || k === "edge_sidecar_to_children") continue;
+        walk(v, depth + 1);
+      }
+      return;
+    }
+    for (const v of Object.values(rec)) walk(v, depth + 1);
+  };
+
+  walk(root, 0);
+  return { items, hasMore, endCursor };
+}
+
 function extractMediaFromHtml(html: string): ExtractedMedia[] {
   const media: ExtractedMedia[] = [];
   const seen = new Set<string>();
@@ -348,6 +493,31 @@ function isTrustedCdnUrl(raw: string): boolean {
   }
 }
 
+/**
+ * Plain-HTTP page fetch shared by metadata extraction and the dedicated
+ * audio-page resolver. Returns raw HTML, or null on any failure.
+ */
+export async function fetchPageHtml(url: string, timeoutMs = 10_000): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": MOBILE_UA,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      redirect: "follow",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const ct = res.headers.get("content-type") || "";
+    if (!res.ok || (!ct.includes("text/html") && !ct.includes("application/xhtml"))) {
+      return null;
+    }
+    return await res.text();
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchMetadata(url: string): Promise<{
   ogImage: string | null;
   ogVideo: string | null;
@@ -365,20 +535,8 @@ export async function fetchMetadata(url: string): Promise<{
     loginWall: false,
   };
   try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": MOBILE_UA,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-      redirect: "follow",
-      signal: AbortSignal.timeout(10_000),
-    });
-    const ct = res.headers.get("content-type") || "";
-    if (!res.ok || (!ct.includes("text/html") && !ct.includes("application/xhtml"))) {
-      return empty;
-    }
-    const html = await res.text();
+    const html = await fetchPageHtml(url);
+    if (!html) return empty;
 
     // Instagram serves its login page (with ITS OWN og:image) to anonymous
     // requests for gated content. Never treat that as the post's media.
@@ -426,6 +584,57 @@ export async function fetchMetadata(url: string): Promise<{
     };
   } catch {
     return empty;
+  }
+}
+
+const SIDECAR_PAGE_TIMEOUT_MS = 8_000;
+const SIDECAR_MAX_EXTRA_PAGES = 3;
+
+/**
+ * Follow a sidecar `end_cursor` with a plain-HTTP request against the same API
+ * endpoint the browser used. Returns the next structured page, or null when
+ * the provider refuses (login/session-gated — the caller keeps whatever was
+ * already collected and logs the outcome honestly). Never throws.
+ */
+async function fetchSidecarPage(requestUrl: string, endCursor: string): Promise<SidecarPage | null> {
+  try {
+    let url = requestUrl;
+    const encoded = encodeURIComponent(endCursor);
+    if (/"after":"[^"]*"/.test(url)) {
+      url = url.replace(/"after":"[^"]*"/, `"after":"${endCursor}"`);
+    } else if (/after%22%3A%22[^&"]*/i.test(url)) {
+      url = url.replace(/after%22%3A%22[^&"]*/i, `after%22%3A%22${encoded}`);
+    } else if (/([?&])after=([^&]*)/.test(url)) {
+      url = url.replace(/([?&])after=([^&]*)/, `$1after=${encoded}`);
+    } else {
+      url = `${url}${url.includes("?") ? "&" : "?"}after=${encoded}`;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), SIDECAR_PAGE_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": MOBILE_UA,
+          Accept: "application/json",
+          "Accept-Language": "en-US,en;q=0.9",
+          Referer: "https://www.instagram.com/",
+          "X-IG-App-ID": "936619743392459",
+        },
+        redirect: "manual",
+      });
+      const ct = res.headers.get("content-type") || "";
+      if (!res.ok || !ct.includes("json")) {
+        await res.body?.cancel().catch(() => {});
+        return null;
+      }
+      const text = await res.text();
+      return extractSidecarFromJson(text);
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return null;
   }
 }
 
@@ -697,6 +906,11 @@ export class PuppeteerProvider extends BaseProvider {
       // different API endpoints (GraphQL, web API, feed, etc.) so we must
       // check ALL JSON responses for media-related keywords.
       const interceptedMedia: ExtractedMedia[] = [];
+      // Pagination state for sidecar children: when an intercepted API page
+      // reports has_next_page, the cursor is followed after the browser pass.
+      // Stored on a const container because TS control-flow ignores writes
+      // made inside the response callback when narrowing a plain `let`.
+      const sidecarState: { page: { url: string; endCursor: string } | null } = { page: null };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       page.on("response", async (res: any) => {
         try {
@@ -710,12 +924,33 @@ export class PuppeteerProvider extends BaseProvider {
                 text.includes("video_url") ||
                 text.includes("display_url") ||
                 text.includes("image_versions") ||
-                text.includes("playback_url")
+                text.includes("playback_url") ||
+                text.includes("edge_sidecar_to_children") ||
+                text.includes("carousel_media")
               ) {
                 const media = extractMediaFromJson(text);
                 for (const item of media) {
                   const exists = interceptedMedia.some((m) => m.url === item.url);
                   if (!exists) interceptedMedia.push(item);
+                }
+                // Structured pass: complete ordered children with real
+                // per-slide dimensions plus pagination state.
+                const sidecar = extractSidecarFromJson(text);
+                for (const item of sidecar.items) {
+                  const exists = interceptedMedia.some((m) => m.url === item.url);
+                  if (!exists) {
+                    interceptedMedia.push(item);
+                  } else if (item.width && item.height) {
+                    // Upgrade the regex-found entry with real dimensions.
+                    const prev = interceptedMedia.find((m) => m.url === item.url);
+                    if (prev && (!prev.width || !prev.height)) {
+                      prev.width = item.width;
+                      prev.height = item.height;
+                    }
+                  }
+                }
+                if (sidecar.hasMore && sidecar.endCursor) {
+                  sidecarState.page = { url: resUrl, endCursor: sidecar.endCursor };
                 }
                 logger.debug("Intercepted media from API", {
                   url: resUrl.slice(0, 100),
@@ -852,6 +1087,92 @@ export class PuppeteerProvider extends BaseProvider {
         // DOM extraction failed
       }
 
+      // Carousel expansion: post slides beyond the first lazy-load as the
+      // user advances, so a single DOM snapshot undercounts multi-image
+      // posts. For /p/ URLs, click the carousel "Next" control (bounded:
+      // max 10 advances, stop after 2 consecutive advances with no new
+      // media) and accumulate every newly exposed image/video URL.
+      if (url.includes("/p/")) {
+        const seenDom = new Set<string>([...domResult.videos, ...domResult.images]);
+        let quietClicks = 0;
+        for (let step = 0; step < 10 && quietClicks < 2; step++) {
+          let clicked = false;
+          try {
+            clicked = await page.evaluate(
+              `(function(){` +
+                `var btns=Array.from(document.querySelectorAll('button[aria-label="Next"]'));` +
+                `if(!btns.length){btns=Array.from(document.querySelectorAll('button')).filter(function(b){return (b.getAttribute('aria-label')||'').toLowerCase().indexOf('next')!==-1;});}` +
+                `for(var i=0;i<btns.length;i++){var r=btns[i].getBoundingClientRect();if(r.width>0&&r.height>0){btns[i].click();return true;}}` +
+                `return false;` +
+                `})()`
+            );
+          } catch {
+            break;
+          }
+          if (!clicked) break;
+          await new Promise((r) => setTimeout(r, 800));
+          let more: { videos: string[]; images: string[] } | null = null;
+          try {
+            more = await page.evaluate(FETCH_META_FN);
+          } catch {
+            break;
+          }
+          if (!more) break;
+          let grew = false;
+          const videoSet = new Set(more.videos);
+          for (const src of [...more.videos, ...more.images]) {
+            if (!seenDom.has(src)) {
+              seenDom.add(src);
+              grew = true;
+              if (videoSet.has(src)) {
+                domResult.videos.push(src);
+              } else {
+                domResult.images.push(src);
+              }
+            }
+          }
+          if (grew) {
+            quietClicks = 0;
+          } else {
+            quietClicks++;
+          }
+        }
+        if (typeof timings === "object") {
+          timings.carouselExpandSlides = seenDom.size;
+        }
+      }
+
+      // Sidecar pagination: when the API exposed only the first page of
+      // children, follow the cursor (bounded to extra pages, never a media
+      // limit) so the COMPLETE collection is returned. If the provider
+      // refuses, whatever was collected stands and the outcome is logged.
+      const pagedMedia: ExtractedMedia[] = [];
+      const pagination = sidecarState.page;
+      if (pagination) {
+        let cursor: string | null = pagination.endCursor;
+        for (let p = 0; p < SIDECAR_MAX_EXTRA_PAGES && cursor; p++) {
+          const next = await fetchSidecarPage(pagination.url, cursor);
+          if (!next || next.items.length === 0) {
+            logger.info("Sidecar pagination stopped", {
+              page: p + 1,
+              reason: next ? "empty-page" : "provider-blocked",
+            });
+            break;
+          }
+          const known = new Set([...interceptedMedia, ...pagedMedia].map((m) => m.url));
+          let fresh = 0;
+          for (const item of next.items) {
+            if (!known.has(item.url)) {
+              known.add(item.url);
+              pagedMedia.push(item);
+              fresh++;
+            }
+          }
+          logger.info("Sidecar page merged", { page: p + 1, fresh, total: pagedMedia.length });
+          cursor = next.hasMore ? next.endCursor : null;
+        }
+      }
+
       // Inspect actual <video> elements: currentSrc (not just the src
       // attribute) reveals blob:-based playback; poster is logged as a
       // boolean only. Hostnames only — never query strings or tokens.
@@ -895,6 +1216,7 @@ export class PuppeteerProvider extends BaseProvider {
       };
 
       for (const item of interceptedMedia) addUnique(item);
+      for (const item of pagedMedia) addUnique(item);
       for (const item of renderedHtmlMedia) addUnique(item);
 
       for (const src of domResult.videos) {
@@ -916,6 +1238,7 @@ export class PuppeteerProvider extends BaseProvider {
 
       logger.debug("[Downloadit Puppeteer Media Debug] candidates", {
         intercepted: interceptedMedia.length,
+        paged: pagedMedia.length,
         renderedHtml: renderedHtmlMedia.length,
         domVideos: domResult.videos.length,
         domImages: domResult.images.length,
@@ -964,7 +1287,7 @@ export class PuppeteerProvider extends BaseProvider {
             onProgress?.(85, "Audio source found");
             return clip;
           }
-          throw createError("AUDIO_UNAVAILABLE");
+          throw createError("AUDIO_NO_SOURCE");
         }
         if (noVideoKind === "REEL" || noVideoKind === "VIDEO") {
           throw createError("VIDEO_SOURCE_NOT_FOUND");
@@ -986,7 +1309,7 @@ export class PuppeteerProvider extends BaseProvider {
           onProgress?.(85, "Audio source found");
           return clip;
         }
-        throw createError("AUDIO_UNAVAILABLE");
+        throw createError("AUDIO_NO_SOURCE");
       }
 
       const orderedMedia = sortVideoFirst(validMedia, contentType);
@@ -1014,10 +1337,13 @@ export class PuppeteerProvider extends BaseProvider {
         null;
 
       logger.info("Puppeteer resolve SUCCESS", {
-        mediaCount: validMedia.length,
+        contentType,
+        discovered: allMedia.length,
+        invalidSkipped: allMedia.length - validMedia.length,
+        returned: validMedia.length,
+        finalCount: orderedMedia.length,
         hasVideo: validMedia.some((m) => m.type === "video"),
         selectedType: orderedMedia[0]?.type ?? null,
-        contentType,
         duration: Date.now() - startTime,
       });
       onProgress?.(85, "Media extracted");
@@ -1126,7 +1452,7 @@ export class PuppeteerProvider extends BaseProvider {
       // Cover art alone is not an audio result: the audio route could only
       // fail downstream with a confusing "no video" message. Fail honestly
       // here so callers get a clear audio error instead.
-      throw createError("AUDIO_UNAVAILABLE");
+      throw createError("AUDIO_NO_SOURCE");
     }
     const author = meta.author || extractAuthorFromUrl(url);
 

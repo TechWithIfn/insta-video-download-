@@ -91,6 +91,12 @@ export const ERRORS: Record<ErrorCode, { message: string; status: number; retrya
     status: 502,
     retryable: true,
   },
+  AUDIO_NO_SOURCE: {
+    message:
+      "This Instagram audio page does not expose a downloadable audio source to anonymous requests. Instagram restricts direct audio access — try pasting a public Reel that uses this sound instead.",
+    status: 502,
+    retryable: false,
+  },
   SERVER_OVERLOADED: {
     message: "Downloadit is busy right now. Please try again shortly.",
     status: 503,

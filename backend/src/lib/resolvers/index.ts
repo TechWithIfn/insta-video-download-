@@ -1,7 +1,8 @@
-import type { InstagramResolver, ResolverResult, ResolveProgressCallback } from "../types.js";
+import type { InstagramResolver, ResolverResult, ResolveProgressCallback, MediaItem } from "../types.js";
 import { createProvider } from "../providers/index.js";
 import { getCachedResult, setCachedResult, deleteCachedResult } from "../provider-cache.js";
 import { enrichMediaItems } from "../media-enrich.js";
+import { resolveAudioPage, isAudioPageUrl } from "../audio-resolve.js";
 import { hashUrl } from "../crypto.js";
 import { logger } from "../logger.js";
 
@@ -24,6 +25,11 @@ export function resetResolver(): void {
   lastProviderName = null;
 }
 
+/** Name of the currently active provider (for structured logging). */
+export function getActiveProviderName(): string {
+  return getResolver().name;
+}
+
 /**
  * Single normalized-type rule shared by all providers: a POST that resolved
  * to multiple media items is a carousel. Provider responses (and URL hints)
@@ -35,6 +41,58 @@ export function normalizeResultType(result: ResolverResult): ResolverResult {
     return { ...result, type: "CAROUSEL" };
   }
   return result;
+}
+
+/** Drop byte-identical URL duplicates (exact string match). */
+export function dedupeExactUrls(items: MediaItem[]): MediaItem[] {
+  const seen = new Set<string>();
+  return items.filter((m) => {
+    if (seen.has(m.url)) return false;
+    seen.add(m.url);
+    return true;
+  });
+}
+
+function mediaScore(m: MediaItem): [number, number] {
+  const w = typeof m.width === "number" ? m.width : 0;
+  const h = typeof m.height === "number" ? m.height : 0;
+  const size = typeof m.size === "number" ? m.size : 0;
+  return [w * h, size];
+}
+
+/**
+ * Collapse same-image renditions: Instagram serves every carousel image at
+ * several resolutions (e.g. s640x640 + full 1440) under the same CDN path —
+ * often even from different CDN hosts — with different query strings, and
+ * page scrapes collect each rendition as a separate "slide". Grouping by
+ * pathname (which embeds the unique media ID) keeps every unique image once,
+ * preferring the largest rendition. Order of first appearance is preserved.
+ * Never reorders unique images.
+ */
+export function dedupeMediaItems(items: MediaItem[]): MediaItem[] {
+  const byKey = new Map<string, MediaItem>();
+  const order: string[] = [];
+  let unkeyed = 0;
+  for (const item of items) {
+    let key: string;
+    try {
+      key = new URL(item.url).pathname;
+    } catch {
+      key = `\0unkeyed-${unkeyed++}`;
+    }
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, item);
+      order.push(key);
+      continue;
+    }
+    const [ea, es] = mediaScore(existing);
+    const [ia, is] = mediaScore(item);
+    if (ia > ea || (ia === ea && is > es)) {
+      byKey.set(key, item);
+    }
+  }
+  return order.map((k) => byKey.get(k) as MediaItem);
 }
 
 export interface ResolveOptions {
@@ -73,6 +131,17 @@ export async function resolveUrl(
   }
 
   const promise = (async () => {
+    // Direct audio pages NEVER go through the post/reel resolver: they carry
+    // no playable media of their own and need the dedicated audio lookup.
+    if (isAudioPageUrl(url)) {
+      logger.info("Resolving via dedicated audio lookup", { url: url.slice(0, 80) });
+      const audio = await resolveAudioPage(url, onProgress);
+      const media = await enrichMediaItems(audio.media);
+      const result: ResolverResult = { ...audio, media };
+      setCachedResult(url, result);
+      return result;
+    }
+
     const resolver = getResolver();
     logger.info("Resolving via provider", {
       provider: resolver.name,
@@ -81,11 +150,23 @@ export async function resolveUrl(
     onProgress?.(25, "Starting resolution");
     const raw = await resolver.resolve(url, onProgress);
     const normalized = normalizeResultType(raw);
-    // Fill gaps the provider left (size/format/dimensions) from the real
-    // media bytes: bounded parallel probes, never fails the resolve, and the
-    // enriched result is what gets cached so carousels never re-probe.
-    const media = await enrichMediaItems(normalized.media);
+    // Collapse exact duplicates before probing so the same bytes are never
+    // fetched twice, then fill gaps the provider left (size/format/dims)
+    // from the real media bytes, then collapse same-image renditions keeping
+    // the largest copy. The final list is what gets cached.
+    const unique = dedupeExactUrls(normalized.media);
+    const enriched = await enrichMediaItems(unique);
+    const media = dedupeMediaItems(enriched);
     const result: ResolverResult = { ...normalized, media };
+    logger.info("Resolve normalized", {
+      type: result.type,
+      provider: resolver.name,
+      discovered: normalized.media.length,
+      exactDupesRemoved: normalized.media.length - unique.length,
+      renditionsRemoved: unique.length - media.length,
+      finalCount: media.length,
+      url: url.slice(0, 80),
+    });
     setCachedResult(url, result);
     return result;
   })();

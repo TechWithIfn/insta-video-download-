@@ -72,6 +72,7 @@ function getContentTypeLabel(type: string, badges: Strings["typeBadges"]): strin
     HIGHLIGHT: badges.highlight,
     VIDEO: badges.video,
     PHOTO: badges.photo,
+    AUDIO: badges.content,
     UNKNOWN: badges.content,
   };
   return labels[type] || badges.content;
@@ -517,6 +518,7 @@ function formatMetaDuration(d: number | null | undefined, fallback: number | nul
 
 function extForMedia(m: { type: string; format?: string | null; url: string }): string {
   const f = (m.format || "").toLowerCase();
+  if (m.type === "audio") return f === "m4a" ? "m4a" : "mp3";
   if (m.type === "video") return "mp4";
   if (f.includes("png")) return "png";
   if (f.includes("webp")) return "webp";
@@ -527,6 +529,10 @@ function extForMedia(m: { type: string; format?: string | null; url: string }): 
 }
 
 function labelForMedia(m: { type: string; format?: string | null }): string {
+  if (m.type === "audio") {
+    const f = (m.format || "").toUpperCase();
+    return f === "M4A" ? "M4A" : "MP3";
+  }
   if (m.type === "video") return "MP4";
   const f = (m.format || "").toUpperCase();
   if (f === "JPG" || f === "JPEG") return "JPG";
@@ -544,8 +550,17 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   // audio element. Shown in the details tiles — never hardcoded.
   const [audioSize, setAudioSize] = useState<number | null>(null);
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
-  // Carousel / highlight navigation: one item visible at a time.
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // Carousel / highlight navigation: one item visible at a time. When the
+  // pasted URL carried `?img_index=N`, open the carousel on that slide
+  // (clamped to the resolved items). MediaResult remounts per result, so the
+  // initializer runs fresh for every new resolve.
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    const s = result.startIndex;
+    if (typeof s === "number" && Number.isFinite(s) && s > 0) {
+      return Math.min(s, Math.max(0, result.media.length - 1));
+    }
+    return 0;
+  });
   // Long captions are clamped with a Show more/less toggle.
   const [captionExpanded, setCaptionExpanded] = useState(false);
   // Real duration/resolution observed from the <video> element (never faked).

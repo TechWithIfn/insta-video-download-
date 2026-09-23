@@ -18,6 +18,7 @@ import {
   fetchUpstreamMedia,
   isHtmlContent,
 } from "../lib/media-proxy.js";
+import { isTrustedProviderMediaUrl } from "../lib/audio-provider.js";
 import type { ErrorCode } from "../lib/types.js";
 
 const router = Router();
@@ -157,32 +158,36 @@ router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
       return;
     }
 
-    // --- 5. Resolve via existing resolver ---
+    // --- 5. Resolve: dedicated audio lookup for audio pages, normal
+    // Reel/video resolve otherwise (shared cache, never duplicated) ---
     logger.info("[AUDIO] resolving", { requestId, url: url.slice(0, 100) });
     const result = await resolveUrl(validation.parsed.normalized);
+    const hasVideo = result.media.some((m) => m.type === "video");
     logger.info("[AUDIO] resolver result", {
       requestId,
+      detectedType: validation.parsed.contentType,
+      audioId: validation.parsed.audioId,
+      provider: result.type === "AUDIO" && validation.parsed.contentType === "AUDIO" ? "audio-lookup" : "resolver",
       type: result.type,
       mediaCount: result.media.length,
-      hasVideo: result.media.some((m) => m.type === "video"),
+      hasVideo,
+      audioSourceFound: hasVideo,
+      videoSourceFound: hasVideo,
     });
 
-    // --- 6. First usable video only ---
-    const videoItem = result.media.find((m) => m.type === "video" && m.url && typeof m.url === "string");
+    // --- 6. First usable source: direct audio file preferred, else video ---
+    const sourceItem = result.media.find(
+      (m) => (m.type === "video" || m.type === "audio") && m.url && typeof m.url === "string"
+    );
+    const videoItem = sourceItem;
     if (!videoItem) {
       logger.warn("[AUDIO] no usable video found", { requestId });
       // An audio page with no resolvable source clip must get a clear audio
       // error — never the confusing "no video in this post" message.
       const audioPage = result.type === "AUDIO" || validation.parsed.contentType === "AUDIO";
       if (audioPage) {
-        res.status(502).json({
-          success: false,
-          error: {
-            code: "AUDIO_UNAVAILABLE" as ErrorCode,
-            message:
-              "Could not resolve an accessible audio source for this audio link. Instagram may be restricting access right now — please try again shortly.",
-          },
-        });
+        const noSource = createError("AUDIO_NO_SOURCE");
+        res.status(noSource.statusCode).json(noSource.toResponse());
         return;
       }
       res.status(400).json({
@@ -196,19 +201,36 @@ router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
     }
 
     // --- 7. Validate resolved media URL ---
-    const mediaValidation = validateProxyUrl(videoItem.url);
-    if (!mediaValidation.ok) {
-      logger.warn("[AUDIO] source blocked", { requestId, error: mediaValidation.error });
-      res.status(403).json(createErrorResponse("CONTENT_UNAVAILABLE"));
-      return;
+    // Video sources keep the strict Instagram-CDN allowlist. Direct audio
+    // files from the configured audio provider are server-resolved (never
+    // user-supplied), so they need https + public-host validation instead.
+    let sourceUrl: string;
+    let sourceHost: string;
+    if (videoItem.type === "audio") {
+      if (!isTrustedProviderMediaUrl(videoItem.url)) {
+        logger.warn("[AUDIO] audio source blocked", { requestId });
+        res.status(403).json(createErrorResponse("CONTENT_UNAVAILABLE"));
+        return;
+      }
+      sourceUrl = videoItem.url;
+      sourceHost = new URL(videoItem.url).hostname;
+    } else {
+      const mediaValidation = validateProxyUrl(videoItem.url);
+      if (!mediaValidation.ok) {
+        logger.warn("[AUDIO] source blocked", { requestId, error: mediaValidation.error });
+        res.status(403).json(createErrorResponse("CONTENT_UNAVAILABLE"));
+        return;
+      }
+      sourceUrl = mediaValidation.value.url;
+      sourceHost = mediaValidation.value.hostname;
     }
-    logger.info("[AUDIO] source validated", { requestId, hostname: mediaValidation.value.hostname });
+    logger.info("[AUDIO] source validated", { requestId, hostname: sourceHost });
 
     // --- 8. Download source video safely ---
     await mkdir(tmpDir, { recursive: true });
     dirCreated = true;
 
-    const upstream = await fetchUpstreamMedia(mediaValidation.value.url, {
+    const upstream = await fetchUpstreamMedia(sourceUrl, {
       timeoutMs: UPSTREAM_TIMEOUT_MS,
       tag: "AUDIO",
       requestId,
@@ -289,6 +311,45 @@ router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
       return;
     }
     logger.info("[AUDIO] source saved to temp", { requestId, bytes: inputBytes });
+
+    // --- 8b. Direct audio passthrough: a genuine audio file needs no
+    // re-encode — serve the verified bytes as MP3 when the source already is
+    // one. Anything else falls through to FFmpeg extraction below.
+    const sourceIsMp3 =
+      videoItem.type === "audio" &&
+      (sourceCT.toLowerCase().startsWith("audio/mpeg") ||
+        sourceCT.toLowerCase().startsWith("audio/mp3"));
+    if (sourceIsMp3) {
+      if (inputBytes > MAX_OUTPUT_BYTES) {
+        logger.warn("[AUDIO] audio source too large", { requestId, size: inputBytes });
+        res.status(413).json(createErrorResponse("REQUEST_TOO_LARGE"));
+        return;
+      }
+      const audioBuffer = await readFile(inputPath).catch(() => null);
+      await cleanupDir(tmpDir, requestId);
+      dirCreated = false;
+      if (!audioBuffer || audioBuffer.length === 0) {
+        logger.error("[AUDIO] empty audio source", { requestId });
+        res.status(502).json(createErrorResponse("CONTENT_UNAVAILABLE"));
+        return;
+      }
+      const safeHandle = sanitizeHandle(result.author?.username);
+      const filename = `${safeHandle}-audio.mp3`;
+      const duration = Date.now() - startTime;
+      logger.info("[AUDIO] complete", {
+        requestId,
+        duration,
+        outputSize: audioBuffer.length,
+        finalResult: "direct-mp3",
+      });
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Length", String(audioBuffer.length));
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("X-Request-Id", requestId);
+      res.send(audioBuffer);
+      return;
+    }
 
     // --- 9. FFmpeg extraction (audio only) ---
     logger.info("[AUDIO] ffmpeg started", { requestId });

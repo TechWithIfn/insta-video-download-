@@ -22,6 +22,14 @@ export interface ParsedInstagramUrl {
   shortcode: string | null;
   storyUsername: string | null;
   highlightId: string | null;
+  /**
+   * 0-based carousel start slide from `?img_index=N` (Instagram numbers
+   * slides from 1). Null when absent/invalid. View-state only: stripped from
+   * the normalized URL so identical posts share one cache entry.
+   */
+  slideIndex: number | null;
+  /** Instagram audio ID from `/reels/audio/<id>/` (null otherwise). */
+  audioId: string | null;
 }
 
 export function validateInstagramUrl(raw: string): {
@@ -97,6 +105,8 @@ export function validateInstagramUrl(raw: string): {
       shortcode: extractShortcode(parsed.pathname),
       storyUsername: extractStoryUsername(parsed.pathname),
       highlightId: extractHighlightId(parsed.pathname),
+      slideIndex: extractSlideIndex(parsed.searchParams),
+      audioId: extractAudioId(parsed.pathname),
     },
   };
 }
@@ -150,11 +160,37 @@ function extractHighlightId(pathname: string): string | null {
   return null;
 }
 
+export function extractAudioId(pathOrUrl: string): string | null {
+  let pathname = pathOrUrl;
+  try {
+    pathname = new URL(pathOrUrl).pathname;
+  } catch {
+    // Not a full URL — treat the input as a bare pathname.
+  }
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments[0] === "reels" && segments[1] === "audio" && segments[2]) {
+    return segments[2].split("?")[0].slice(0, 64) || null;
+  }
+  return null;
+}
+
+function extractSlideIndex(params: URLSearchParams): number | null {
+  const raw = params.get("img_index");
+  if (!raw) return null;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1 || n > 100) return null;
+  return n - 1;
+}
+
 function cleanUrl(url: URL): URL {
   const cleaned = new URL(url.origin + url.pathname);
 
   url.searchParams.forEach((value, key) => {
-    if (!TRACKING_PARAMS.has(key.toLowerCase())) {
+    const lower = key.toLowerCase();
+    // img_index is viewer state (which slide was open), not post identity —
+    // strip it so cache keys coalesce; the parsed slideIndex carries it.
+    if (lower === "img_index") return;
+    if (!TRACKING_PARAMS.has(lower)) {
       cleaned.searchParams.set(key, value);
     }
   });

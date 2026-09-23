@@ -21,10 +21,36 @@ describe("validateInstagramUrl", () => {
       expect(result.parsed?.contentType).toBe("REEL");
     });
 
+    it("parses img_index as a 0-based slide index and strips it from the URL", () => {
+      const result = validateInstagramUrl("https://www.instagram.com/p/DcWV7JVE10j/?img_index=9");
+      expect(result.valid).toBe(true);
+      expect(result.parsed?.contentType).toBe("POST");
+      expect(result.parsed?.slideIndex).toBe(8);
+      expect(result.parsed?.normalized).not.toContain("img_index");
+    });
+
+    it("returns null slide index without img_index", () => {
+      const result = validateInstagramUrl("https://www.instagram.com/p/DcWV7JVE10j/");
+      expect(result.valid).toBe(true);
+      expect(result.parsed?.slideIndex).toBeNull();
+    });
+
+    it("resolves the same collection identity with and without img_index", () => {
+      const base = validateInstagramUrl("https://www.instagram.com/p/DdPBl2PE1J7/");
+      const indexed = validateInstagramUrl("https://www.instagram.com/p/DdPBl2PE1J7/?img_index=2");
+      expect(base.valid).toBe(true);
+      expect(indexed.valid).toBe(true);
+      // Same canonical collection (shared cache), different start slide.
+      expect(indexed.parsed?.normalized).toBe(base.parsed?.normalized);
+      expect(indexed.parsed?.slideIndex).toBe(1);
+      expect(base.parsed?.slideIndex).toBeNull();
+    });
+
     it("accepts an audio page URL as AUDIO, not a reel", () => {
       const result = validateInstagramUrl("https://www.instagram.com/reels/audio/409293986509384/");
       expect(result.valid).toBe(true);
       expect(result.parsed?.contentType).toBe("AUDIO");
+      expect(result.parsed?.audioId).toBe("409293986509384");
     });
 
     it("accepts a story URL", () => {

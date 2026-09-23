@@ -156,6 +156,10 @@ export function formatFromContentType(contentType: string | null): string | null
   if (ct === "image/webp") return "webp";
   if (ct === "image/gif") return "gif";
   if (ct === "video/mp4" || ct === "video/x-mp4") return "mp4";
+  if (ct === "audio/mpeg" || ct === "audio/mp3") return "mp3";
+  if (ct === "audio/mp4" || ct === "audio/x-m4a") return "m4a";
+  if (ct === "audio/wav" || ct === "audio/x-wav") return "wav";
+  if (ct === "audio/ogg") return "ogg";
   return null;
 }
 

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { isFfmpegAvailable, getFfmpegVersionSync } from "../lib/ffmpeg.js";
+import { audioProviderStatus } from "../lib/audio-provider.js";
 
 const router = Router();
 
@@ -28,6 +29,8 @@ router.get("/ready", async (_req: Request, res: Response) => {
     status: "ok",
     provider: providerName,
     providerConfigured: providerName !== "placeholder",
+    // Presence flag only — credentials never leave the backend.
+    audioProvider: audioProviderStatus(),
     ffmpegAvailable,
     node: process.version,
     platform: process.platform,

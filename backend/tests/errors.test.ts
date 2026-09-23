@@ -40,6 +40,17 @@ describe("createError", () => {
     expect(response.error.code).toBe("CONTENT_NOT_FOUND");
   });
 
+  it("maps AUDIO_NO_SOURCE to a specific non-retryable audio error", () => {
+    const error = createError("AUDIO_NO_SOURCE");
+    expect(error.code).toBe("AUDIO_NO_SOURCE");
+    expect(error.statusCode).toBe(502);
+    const response = error.toResponse();
+    expect(response.success).toBe(false);
+    expect(response.error.retryable).toBe(false);
+    expect(response.error.message).toContain("audio");
+    expect(response.error.message).not.toBe("Audio extraction is currently unavailable. Please try again.");
+  });
+
   it("maps VIDEO_SOURCE_NOT_FOUND to a retryable honest error", () => {
     const error = createError("VIDEO_SOURCE_NOT_FOUND");
     expect(error.statusCode).toBe(502);

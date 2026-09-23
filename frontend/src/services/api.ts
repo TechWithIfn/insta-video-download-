@@ -4,7 +4,7 @@ export function getApiBase(): string {
 
 export interface MediaItem {
   url: string;
-  type: "image" | "video";
+  type: "image" | "video" | "audio";
   width: number | null;
   height: number | null;
   duration: number | null;
@@ -26,6 +26,8 @@ export interface ResolveData {
   author: Author | null;
   media: MediaItem[];
   mediaId?: string;
+  /** 0-based carousel start slide from `?img_index=` (null when absent). */
+  startIndex?: number | null;
 }
 
 export interface ResolveSuccess {

@@ -2,6 +2,7 @@ import "dotenv/config";
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
 import { getProvider } from "./lib/providers/index.js";
+import { audioProviderStatus } from "./lib/audio-provider.js";
 
 // Local development / traditional hosting entry point.
 // On Vercel serverless, api/index.ts serves the exported app instead and
@@ -27,6 +28,11 @@ const server = app.listen(PORT, () => {
   if (providerName === "puppeteer") {
     logger.info("Puppeteer provider active — headless Chrome will resolve Instagram URLs");
   }
+
+  logger.info("Audio provider status", {
+    audioProvider: audioProviderStatus(),
+    detail: "Set AUDIO_PROVIDER_URL + AUDIO_PROVIDER_KEY to enable direct audio-page resolution",
+  });
 });
 
 function shutdown(signal: string) {

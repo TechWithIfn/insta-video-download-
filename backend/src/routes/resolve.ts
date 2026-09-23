@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { validateInstagramUrl } from "../lib/validators/instagram-url.js";
-import { resolveUrl } from "../lib/resolvers/index.js";
+import { resolveUrl, getActiveProviderName } from "../lib/resolvers/index.js";
 import { checkRateLimit } from "../lib/rate-limit.js";
 import { generateToken } from "../lib/crypto.js";
 import { storeMedia } from "../lib/temp-store.js";
@@ -98,8 +98,12 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
     logger.info("Resolution complete", {
       requestId,
       duration,
-      provider: "resolved",
+      detectedType: validation.parsed.contentType,
+      audioId: validation.parsed.audioId,
+      provider: getActiveProviderName(),
       mediaCount: result.media.length,
+      failedItems: 0,
+      finalResult: result.type,
       mediaId,
       ...firstMediaDiag(result.media),
     });
@@ -110,6 +114,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
         ...result,
         sourceUrl: validation.parsed.normalized,
         mediaId,
+        startIndex: validation.parsed.slideIndex,
       },
     };
 
@@ -278,8 +283,12 @@ router.get("/stream", async (req: Request, res: Response): Promise<void> => {
     logger.info("Resolution complete", {
       requestId,
       duration,
-      provider: "resolved",
+      detectedType: validation.parsed.contentType,
+      audioId: validation.parsed.audioId,
+      provider: getActiveProviderName(),
       mediaCount: result.media.length,
+      failedItems: 0,
+      finalResult: result.type,
       mediaId,
       ...firstMediaDiag(result.media),
     });
@@ -288,6 +297,7 @@ router.get("/stream", async (req: Request, res: Response): Promise<void> => {
       ...result,
       sourceUrl: validation.parsed.normalized,
       mediaId,
+      startIndex: validation.parsed.slideIndex,
     };
     send("complete", { progress: 100, stage: "Media ready!", data });
     finish();
