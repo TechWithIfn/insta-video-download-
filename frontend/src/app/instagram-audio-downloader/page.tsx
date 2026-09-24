@@ -28,7 +28,7 @@ export default function AudioDownloaderPage() {
     <>
       <Header />
       <main className="flex-1">
-        <section className="mx-auto max-w-[900px] px-5 sm:px-6 lg:px-12 pt-28 sm:pt-36 pb-12">
+        <section className="mx-auto max-w-[900px] px-5 sm:px-6 lg:px-12 pt-8 sm:pt-12 pb-12">
           <h1 className="text-[32px] font-extrabold tracking-[-0.02em] text-fg sm:text-[42px] leading-[1.1]">Instagram Audio Downloader</h1>
           <p className="mt-4 text-[17px] leading-[1.7] text-fg-muted">
             Download Instagram audio as MP3 with Downloadit. Extract music and sound from public Reels and videos and save the audio track to your device — no login required.
@@ -81,7 +81,6 @@ export default function AudioDownloaderPage() {
               { href: "/instagram-video-downloader", label: "Instagram Video Downloader", desc: "Save videos as MP4" },
               { href: "/instagram-photo-downloader", label: "Instagram Photo Downloader", desc: "Save photos as JPG" },
               { href: "/instagram-story-downloader", label: "Instagram Story Downloader", desc: "Save stories before they expire" },
-              { href: "/instagram-highlights-downloader", label: "Instagram Highlights Downloader", desc: "Save highlight collections" },
               { href: "/", label: "Instagram Downloader Home", desc: "All-in-one media downloader" },
             ].map((l) => (
               <Link key={l.href} href={l.href} className="rounded-2xl p-4 hover:bg-primary-light transition-colors" style={{ border: "1px solid var(--border)", background: "var(--card)" }}>
@@ -118,4 +117,5 @@ export default function AudioDownloaderPage() {
     </>
   );
 }
+
 

@@ -51,7 +51,6 @@ export const gu: Strings = {
     videos: "વિડિઓ",
     photos: "ફોટા",
     stories: "સ્ટોરીઝ",
-    highlights: "હાઇલાઇટ્સ",
     audio: "ઓડિયો",
   },
   typeBadges: {
@@ -59,7 +58,6 @@ export const gu: Strings = {
     post: "પોસ્ટ",
     carousel: "કેરોસેલ",
     story: "સ્ટોરી",
-    highlight: "હાઇલાઇટ",
     video: "વિડિઓ",
     photo: "ફોટો",
     content: "કન્ટેન્ટ",
@@ -118,10 +116,6 @@ export const gu: Strings = {
       {
         title: "સ્ટોરીઝ",
         desc: "કોઈપણ પ્રોફાઇલની જાહેર સ્ટોરીઝ, ગાયબ થતાં પહેલાં પકડો.",
-      },
-      {
-        title: "હાઇલાઇટ્સ",
-        desc: "જાહેર Instagram પ્રોફાઇલના સાચવેલા હાઇલાઇટ સંગ્રહ, એકસાથે.",
       },
       {
         title: "ઓડિયો",
@@ -353,3 +347,4 @@ export const gu: Strings = {
     supportBtn: "ઈમેલ સહાય",
   },
 };
+

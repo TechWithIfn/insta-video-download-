@@ -41,7 +41,6 @@ export default function Footer() {
     { label: "Instagram Reels Downloader", href: "/instagram-reels-downloader" },
     { label: "Instagram Video Downloader", href: "/instagram-video-downloader" },
     { label: "Instagram Photo Downloader", href: "/instagram-photo-downloader" },
-    { label: "Instagram Highlights Downloader", href: "/instagram-highlights-downloader" },
     { label: "Instagram Story Downloader", href: "/instagram-story-downloader" },
     { label: "Instagram Audio Downloader", href: "/instagram-audio-downloader" },
   ];
@@ -61,7 +60,7 @@ export default function Footer() {
   ];
 
   return (
-    <footer className="mt-20 border-t border-border px-4 py-12 sm:px-6 lg:px-12">
+    <footer className="mt-20 border-t border-border px-4 py-12 sm:px-6 lg:px-8 xl:px-12">
       <div className="mx-auto max-w-[1200px]">
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
           {/* Brand */}

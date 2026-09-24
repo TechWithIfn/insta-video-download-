@@ -51,7 +51,6 @@ export const ta: Strings = {
     videos: "வீடியோக்கள்",
     photos: "புகைப்படங்கள்",
     stories: "ஸ்டோரிகள்",
-    highlights: "சிறப்பம்சங்கள்",
     audio: "ஒலி",
   },
   typeBadges: {
@@ -59,7 +58,6 @@ export const ta: Strings = {
     post: "இடுகை",
     carousel: "தொகுப்பு",
     story: "ஸ்டோரி",
-    highlight: "சிறப்பம்சம்",
     video: "வீடியோ",
     photo: "புகைப்படம்",
     content: "உள்ளடக்கம்",
@@ -118,10 +116,6 @@ export const ta: Strings = {
       {
         title: "ஸ்டோரிகள்",
         desc: "எந்தக் கணக்கின் பொது ஸ்டோரிகளையும் மறைவதற்குள் பிடியுங்கள்.",
-      },
-      {
-        title: "சிறப்பம்சங்கள்",
-        desc: "பொது Instagram கணக்குகளின் சேமித்த தொகுப்புகள், ஒரே நேரத்தில்.",
       },
       {
         title: "ஒலி",
@@ -353,3 +347,4 @@ export const ta: Strings = {
     supportBtn: "மின்னஞ்சல் உதவி",
   },
 };
+

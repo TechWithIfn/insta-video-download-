@@ -51,7 +51,6 @@ export const kn: Strings = {
     videos: "ವೀಡಿಯೊಗಳು",
     photos: "ಫೋಟೋಗಳು",
     stories: "ಸ್ಟೋರಿಗಳು",
-    highlights: "ಹೈಲೈಟ್ಸ್",
     audio: "ಆಡಿಯೊ",
   },
   typeBadges: {
@@ -59,7 +58,6 @@ export const kn: Strings = {
     post: "ಪೋಸ್ಟ್",
     carousel: "ಕೆರೋಸೆಲ್",
     story: "ಸ್ಟೋರಿ",
-    highlight: "ಹೈಲೈಟ್",
     video: "ವೀಡಿಯೊ",
     photo: "ಫೋಟೋ",
     content: "ವಿಷಯ",
@@ -118,10 +116,6 @@ export const kn: Strings = {
       {
         title: "ಸ್ಟೋರಿಗಳು",
         desc: "ಯಾವುದೇ ಪ್ರೊಫೈಲ್‌ನ ಸಾರ್ವಜನಿಕ ಸ್ಟೋರಿಗಳನ್ನು ಕಣ್ಮರೆಯಾಗುವ ಮೊದಲು ಹಿಡಿಯಿರಿ.",
-      },
-      {
-        title: "ಹೈಲೈಟ್ಸ್",
-        desc: "ಸಾರ್ವಜನಿಕ Instagram ಪ್ರೊಫೈಲ್‌ಗಳ ಉಳಿಸಿದ ಹೈಲೈಟ್ ಸಂಗ್ರಹಗಳು, ಒಟ್ಟಿಗೆ.",
       },
       {
         title: "ಆಡಿಯೊ",
@@ -353,3 +347,4 @@ export const kn: Strings = {
     supportBtn: "ಇಮೇಲ್ ಬೆಂಬಲ",
   },
 };
+

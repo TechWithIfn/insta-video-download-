@@ -51,7 +51,6 @@ export const or: Strings = {
     videos: "ଭିଡିଓ",
     photos: "ଫଟୋ",
     stories: "ଷ୍ଟୋରୀଜ",
-    highlights: "ହାଇଲାଇଟ୍ସ",
     audio: "ଅଡିଓ",
   },
   typeBadges: {
@@ -59,7 +58,6 @@ export const or: Strings = {
     post: "ପୋଷ୍ଟ",
     carousel: "କ୍ୟାରୋସେଲ",
     story: "ଷ୍ଟୋରୀ",
-    highlight: "ହାଇଲାଇଟ",
     video: "ଭିଡିଓ",
     photo: "ଫଟୋ",
     content: "ବିଷୟ",
@@ -118,10 +116,6 @@ export const or: Strings = {
       {
         title: "ଷ୍ଟୋରୀଜ",
         desc: "ଯେକୌଣସି ପ୍ରୋଫାଇଲର ସାର୍ବଜନୀନ ଷ୍ଟୋରୀ, ଅଦୃଶ୍ୟ ହେବା ପୂର୍ବରୁ ଧରନ୍ତୁ।",
-      },
-      {
-        title: "ହାଇଲାଇଟ୍ସ",
-        desc: "ସାର୍ବଜନୀନ Instagram ପ୍ରୋଫାଇଲର ସଂରକ୍ଷିତ ହାଇଲାଇଟ ସଂଗ୍ରହ, ଏକାଠି।",
       },
       {
         title: "ଅଡିଓ",
@@ -353,3 +347,4 @@ export const or: Strings = {
     supportBtn: "ଇମେଲ ସହାୟତା",
   },
 };
+

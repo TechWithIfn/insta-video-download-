@@ -28,7 +28,7 @@ export default function VideoDownloaderPage() {
     <>
       <Header />
       <main className="flex-1">
-        <section className="mx-auto max-w-[900px] px-5 sm:px-6 lg:px-12 pt-28 sm:pt-36 pb-12">
+        <section className="mx-auto max-w-[900px] px-5 sm:px-6 lg:px-12 pt-8 sm:pt-12 pb-12">
           <h1 className="text-[32px] font-extrabold tracking-[-0.02em] text-fg sm:text-[42px] leading-[1.1]">Instagram Video Downloader</h1>
           <p className="mt-4 text-[17px] leading-[1.7] text-fg-muted">
             Download public Instagram videos as MP4 with Downloadit. Whether it’s a standard feed video, IGTV-style clip, or long-form post, paste the video link, preview the file and save it to your device — no login required.
@@ -80,7 +80,6 @@ export default function VideoDownloaderPage() {
               { href: "/instagram-reels-downloader", label: "Instagram Reels Downloader", desc: "Save Reels as MP4" },
               { href: "/instagram-photo-downloader", label: "Instagram Photo Downloader", desc: "Save photos as JPG" },
               { href: "/instagram-story-downloader", label: "Instagram Story Downloader", desc: "Save stories before they expire" },
-              { href: "/instagram-highlights-downloader", label: "Instagram Highlights Downloader", desc: "Save highlight collections" },
               { href: "/instagram-audio-downloader", label: "Instagram Audio Downloader", desc: "Extract MP3 from videos" },
               { href: "/", label: "Instagram Downloader Home", desc: "All-in-one media downloader" },
             ].map((l) => (
@@ -118,4 +117,5 @@ export default function VideoDownloaderPage() {
     </>
   );
 }
+
 

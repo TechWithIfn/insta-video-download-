@@ -12,7 +12,7 @@ export default function LegalPage({
   children: ReactNode;
 }) {
   return (
-    <section className="mx-auto w-full max-w-[720px] px-4 pb-20 pt-28 sm:px-6 sm:pt-36">
+    <section className="mx-auto w-full max-w-[720px] px-4 pb-20 pt-8 sm:px-6 sm:pt-12">
       <Link
         href="/"
         className="inline-flex min-h-[44px] items-center text-[14px] font-semibold text-fg-muted transition-colors hover:text-primary"

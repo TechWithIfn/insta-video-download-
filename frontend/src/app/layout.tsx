@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     siteName: BRAND_NAME,
     url: SITE_URL,
     locale: "en_US",
-    images: [{ url: "/og-downloadit.png", width: 1200, height: 630, alt: "Downloadit — Instagram Downloader for Reels, Videos, Photos, Highlights and Audio" }],
+    images: [{ url: "/og-downloadit.png", width: 1200, height: 630, alt: "Downloadit — Instagram Downloader for Reels, Videos, Photos, and Audio" }],
   },
   twitter: {
     card: "summary_large_image",
@@ -46,11 +46,15 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "48x48" },
       { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
       { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
       { url: "/favicon-48x48.png", sizes: "48x48", type: "image/png" },
     ],
-    apple: "/apple-touch-icon.png",
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
   },
   manifest: "/manifest.webmanifest",
   robots: {

@@ -19,7 +19,7 @@ export default function Home() {
 
   useEffect(() => {
     const requestedTab = new URLSearchParams(window.location.search).get("tab");
-    if (requestedTab === "reels" || requestedTab === "videos" || requestedTab === "photos" || requestedTab === "stories" || requestedTab === "highlights" || requestedTab === "audio") {
+    if (requestedTab === "reels" || requestedTab === "videos" || requestedTab === "photos" || requestedTab === "stories" || requestedTab === "audio") {
       queueMicrotask(() => setActiveTab(requestedTab));
     }
   }, []);
@@ -76,7 +76,7 @@ export default function Home() {
             <div className="rounded-[24px] p-6 sm:p-8" style={{ background: "var(--card)", border: "1px solid var(--border)", boxShadow: "var(--shadow-card)" }}>
               <h2 id="about-downloadit" className="text-[24px] font-bold tracking-[-0.02em] text-fg sm:text-[28px]">Download Instagram content without login</h2>
               <p className="mt-3 text-[15px] leading-[1.7] text-fg-muted">
-                Downloadit is a fast Instagram downloader that lets you save public Instagram Reels, videos, photos, Highlights, stories and audio to your phone or desktop. Paste a public link, preview the media, and save it as MP4, JPG or MP3 — no login, no app install, and no account required.
+                Downloadit is a fast Instagram downloader that lets you save public Instagram Reels, videos, photos, stories and audio to your phone or desktop. Paste a public link, preview the media, and save it as MP4, JPG or MP3 — no login, no app install, and no account required.
               </p>
               <div className="mt-6 grid gap-6">
                 <div>
@@ -84,8 +84,7 @@ export default function Home() {
                   <ul className="mt-2 list-disc pl-5 text-[14.5px] leading-[1.7] text-fg-muted">
                     <li><strong className="text-fg">Instagram Reels downloader online</strong> — save trending Reels as MP4. Use Downloadit as an Instagram reel saver to keep short vertical videos for offline viewing. <a href="/instagram-reels-downloader" className="text-primary hover:underline">Instagram Reels Downloader</a></li>
                     <li><strong className="text-fg">Instagram video downloader</strong> — download standard feed videos and save Instagram videos to phone. Converts Instagram video to MP4 in HD. <a href="/instagram-video-downloader" className="text-primary hover:underline">Instagram Video Downloader</a></li>
-                    <li><strong className="text-fg">Instagram photo downloader</strong> — save Instagram photos and images in original quality. Supports single photos and carousel slides. <a href="/instagram-photo-downloader" className="text-primary hover:underline">Instagram Photo Downloader</a></li>
-                    <li><strong className="text-fg">Instagram Highlights downloader</strong> — save highlight collections from public profiles as MP4 or JPG. <a href="/instagram-highlights-downloader" className="text-primary hover:underline">Instagram Highlights Downloader</a></li>
+                    <li><strong className="text-fg">Instagram photo downloader</strong> — save Instagram photos and images in original quality. Supports single photos and image posts. <a href="/instagram-photo-downloader" className="text-primary hover:underline">Instagram Photo Downloader</a></li>
                     <li><strong className="text-fg">Instagram story downloader</strong> — save public stories before they expire. Works as an Instagram story saver for images and videos. <a href="/instagram-story-downloader" className="text-primary hover:underline">Instagram Story Downloader</a></li>
                     <li><strong className="text-fg">Instagram audio downloader</strong> — extract audio from Reels and videos and download as MP3. Also works as Instagram music downloader and reel audio downloader. <a href="/instagram-audio-downloader" className="text-primary hover:underline">Instagram Audio Downloader</a></li>
                   </ul>
@@ -93,7 +92,7 @@ export default function Home() {
                 <div>
                   <h3 className="text-[16px] font-bold text-fg">How downloading works</h3>
                   <p className="mt-2 text-[14.5px] leading-[1.7] text-fg-muted">
-                    Copy a public Instagram post link, paste it into Downloadit, and tap Get Media. The backend validates the URL, detects whether it’s a Reel, video, photo, highlight, story or audio, and returns a preview you can download. No-login workflow means you never share your Instagram password — the tool works only with links you can already view publicly in a browser.
+                    Copy a public Instagram post link, paste it into Downloadit, and tap Get Media. The backend validates the URL, detects whether it’s a Reel, video, photo, story or audio, and returns a preview you can download. No-login workflow means you never share your Instagram password — the tool works only with links you can already view publicly in a browser.
                   </p>
                 </div>
                 <div>

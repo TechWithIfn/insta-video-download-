@@ -318,6 +318,24 @@ button:focus-visible {
   100% { background-position: 200% 0; }
 }
 
+@keyframes subtle-float-1 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes subtle-float-2 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(7px); }
+}
+
+.animate-float-1 {
+  animation: subtle-float-1 4.5s ease-in-out infinite;
+}
+
+.animate-float-2 {
+  animation: subtle-float-2 5.5s ease-in-out infinite;
+}
+
 @keyframes slide-in-right {
   from {
     opacity: 0;
@@ -681,9 +699,9 @@ svg {
     left: 25px !important;
   }
 
-  /* Hero spacing: kill excessive empty space */
+  /* Hero spacing: comfortable vertical rhythm below sticky header */
   .hero-section {
-    padding-top: calc(76px + var(--sat)) !important;
+    padding-top: 1.25rem !important;
     padding-bottom: 2rem !important;
   }
 

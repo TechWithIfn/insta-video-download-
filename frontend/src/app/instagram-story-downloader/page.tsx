@@ -28,7 +28,7 @@ export default function StoryDownloaderPage() {
     <>
       <Header />
       <main className="flex-1">
-        <section className="mx-auto max-w-[900px] px-5 sm:px-6 lg:px-12 pt-28 sm:pt-36 pb-12">
+        <section className="mx-auto max-w-[900px] px-5 sm:px-6 lg:px-12 pt-8 sm:pt-12 pb-12">
           <h1 className="text-[32px] font-extrabold tracking-[-0.02em] text-fg sm:text-[42px] leading-[1.1]">Instagram Story Downloader</h1>
           <p className="mt-4 text-[17px] leading-[1.7] text-fg-muted">
             Download public Instagram Stories before they disappear with Downloadit. Save story images and videos from public accounts to your phone — no login required.
@@ -77,7 +77,6 @@ export default function StoryDownloaderPage() {
           <h2 className="mt-10 text-[18px] font-bold text-fg">Related downloaders</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {[
-              { href: "/instagram-highlights-downloader", label: "Instagram Highlights Downloader", desc: "Save highlight collections" },
               { href: "/instagram-reels-downloader", label: "Instagram Reels Downloader", desc: "Save Reels as MP4" },
               { href: "/instagram-photo-downloader", label: "Instagram Photo Downloader", desc: "Save photos as JPG" },
               { href: "/instagram-video-downloader", label: "Instagram Video Downloader", desc: "Save videos as MP4" },
@@ -118,4 +117,5 @@ export default function StoryDownloaderPage() {
     </>
   );
 }
+
 

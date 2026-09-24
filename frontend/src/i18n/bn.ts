@@ -51,7 +51,6 @@ export const bn: Strings = {
     videos: "ভিডিও",
     photos: "ছবি",
     stories: "স্টোরি",
-    highlights: "হাইলাইটস",
     audio: "অডিও",
   },
   typeBadges: {
@@ -59,7 +58,6 @@ export const bn: Strings = {
     post: "পোস্ট",
     carousel: "ক্যারোসেল",
     story: "স্টোরি",
-    highlight: "হাইলাইট",
     video: "ভিডিও",
     photo: "ছবি",
     content: "কন্টেন্ট",
@@ -118,10 +116,6 @@ export const bn: Strings = {
       {
         title: "স্টোরি",
         desc: "যেকোনো প্রোফাইলের পাবলিক স্টোরি, মুছে যাওয়ার আগেই ধরে রাখুন।",
-      },
-      {
-        title: "হাইলাইটস",
-        desc: "পাবলিক Instagram প্রোফাইলের সংরক্ষিত হাইলাইট সংগ্রহ, একসাথে।",
       },
       {
         title: "অডিও",
@@ -353,3 +347,4 @@ export const bn: Strings = {
     supportBtn: "ইমেল সহায়তা",
   },
 };
+

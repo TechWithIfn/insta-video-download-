@@ -28,7 +28,7 @@ export default function ReelsDownloaderPage() {
     <>
       <Header />
       <main className="flex-1">
-        <section className="mx-auto max-w-[900px] px-5 sm:px-6 lg:px-12 pt-28 sm:pt-36 pb-12">
+        <section className="mx-auto max-w-[900px] px-5 sm:px-6 lg:px-12 pt-8 sm:pt-12 pb-12">
           <h1 className="text-[32px] font-extrabold tracking-[-0.02em] text-fg sm:text-[42px] leading-[1.1]">
             Instagram Reels Downloader
           </h1>
@@ -86,7 +86,6 @@ export default function ReelsDownloaderPage() {
               { href: "/instagram-video-downloader", label: "Instagram Video Downloader", desc: "Save standard video posts as MP4" },
               { href: "/instagram-photo-downloader", label: "Instagram Photo Downloader", desc: "Save photos and carousel slides as JPG" },
               { href: "/instagram-story-downloader", label: "Instagram Story Downloader", desc: "Save stories before they expire" },
-              { href: "/instagram-highlights-downloader", label: "Instagram Highlights Downloader", desc: "Save highlight collections from profiles" },
               { href: "/instagram-audio-downloader", label: "Instagram Audio Downloader", desc: "Extract MP3 audio from Reels" },
               { href: "/", label: "Instagram Downloader Home", desc: "All-in-one media downloader" },
             ].map((l) => (
@@ -124,4 +123,5 @@ export default function ReelsDownloaderPage() {
     </>
   );
 }
+
 

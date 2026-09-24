@@ -33,9 +33,9 @@ export const en: Strings = {
   },
   hero: {
     badge: "Fast · Free · No login required",
-    titleA: "Instagram Downloader –",
+    titleA: "Instagram Downloader",
     titleB: "Reels, Videos, Photos & Audio",
-    subtitle: "Download public Instagram Reels, videos, photos, Highlights and audio with Downloadit. Preview media and save it to your device quickly — no login required.",
+    subtitle: "Download public Instagram Reels, videos, photos and audio with Downloadit. Preview media and save it to your device quickly, no login required.",
     cardTitle: "Paste an Instagram Link",
     placeholder: "https://www.instagram.com/reel/...",
     audioPlaceholder: "https://www.instagram.com/reel/...",
@@ -50,7 +50,6 @@ export const en: Strings = {
     videos: "Videos",
     photos: "Photos",
     stories: "Stories",
-    highlights: "Highlights",
     audio: "Audio",
   },
   typeBadges: {
@@ -58,7 +57,6 @@ export const en: Strings = {
     post: "Post",
     carousel: "Carousel",
     story: "Story",
-    highlight: "Highlight",
     video: "Video",
     photo: "Photo",
     content: "Content",
@@ -111,16 +109,12 @@ export const en: Strings = {
         desc: "Individual image posts preserved at their original resolution and detail.",
       },
       {
-        title: "Carousels",
-        desc: "Multi-image and mixed posts — every slide saved individually in one tap.",
+        title: "Multi-Photo Posts",
+        desc: "Download individual photos from multi-image posts — every image saved separately in full resolution.",
       },
       {
         title: "Stories",
         desc: "Public stories from any profile, captured before they disappear.",
-      },
-      {
-        title: "Highlights",
-        desc: "Saved highlight collections from public Instagram profiles, all at once.",
       },
       {
         title: "Audio",
@@ -147,7 +141,7 @@ export const en: Strings = {
       },
       {
         title: "Multiple content types",
-        desc: "Reels, photos, videos, carousels, stories, and highlights — all in one tool.",
+        desc: "Reels, photos, videos and stories — all in one tool.",
       },
       {
         title: "No account required",
@@ -182,11 +176,7 @@ export const en: Strings = {
       },
       {
         q: "How do I download Instagram photos in original quality?",
-        a: "Paste a public photo or carousel link. Downloadit shows each slide as JPG/PNG in original quality. Navigate with Next/Previous and save any image.",
-      },
-      {
-        q: "Can I download Instagram Highlights?",
-        a: "Yes, if the Highlights are from a profile you can view publicly. Paste a Highlights link, preview each item, and download MP4 for videos or JPG for images.",
+        a: "Paste a public photo link. Downloadit shows each image in original quality — download any photo as JPG/PNG.",
       },
       {
         q: "How does the Instagram story downloader work?",
@@ -198,7 +188,7 @@ export const en: Strings = {
       },
       {
         q: "What formats are supported?",
-        a: "Videos and Reels → MP4 (Instagram MP4 download), photos → JPG/PNG/WebP, audio → MP3 (Instagram MP3 download). Highlights and stories keep their original image or video format.",
+        a: "Videos and Reels → MP4 (Instagram MP4 download), photos → JPG/PNG/WebP, audio → MP3 (Instagram MP3 download). Stories keep their original image or video format.",
       },
       {
         q: "Is Downloadit free and does it require login?",
@@ -234,9 +224,9 @@ export const en: Strings = {
     downloadAudioLabel: "Download audio as MP3",
   },
   errors: {
-    empty: "Please enter a link to an Instagram post, reel, story, or highlight.",
+    empty: "Please enter a link to an Instagram post, reel or story.",
     invalid:
-      "That doesn't look like a valid Instagram link. Try a link to a post, reel, story, highlight, or video.",
+      "That doesn't look like a valid Instagram link. Try a link to a post, reel, story or video.",
     failed: "Something went wrong. Please try again.",
     unreachable: "Could not reach the server. Check your connection and try again.",
   },
@@ -335,7 +325,7 @@ export const en: Strings = {
       },
       {
         q: "Which content types are supported?",
-        a: "Reels, videos, photos, stories, highlights, and audio extraction from videos.",
+        a: "Reels, videos, photos, stories and audio extraction from videos.",
       },
       {
         q: "Why did my media link expire?",
@@ -364,3 +354,4 @@ export const en: Strings = {
     supportBtn: "Email Support",
   },
 };
+

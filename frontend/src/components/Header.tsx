@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Globe, HelpCircle, Sun, Moon, Download, Menu, X, Check, Home as HomeIcon, Film, Video, Image as ImageIcon, Music2, Star, Clock, Lightbulb, CircleHelp, Shield, FileText, Mail } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Globe, HelpCircle, Sun, Moon, Download, Menu, X, Check, Home as HomeIcon, Film, Video, Image as ImageIcon, Music2, Clock, Lightbulb, CircleHelp, Shield, FileText, Mail, ChevronDown } from "lucide-react";
 import { useLanguage, LANGUAGES } from "@/i18n";
 import { SUPPORT_GMAIL_URL } from "@/config/site";
 import type { DownloaderTab } from "@/components/HeroDownloader";
+import ToolCategoryDropdown from "@/components/ToolCategoryDropdown";
 
 function getInitialTheme(): "light" | "dark" {
   if (typeof window === "undefined") return "light";
@@ -23,10 +24,9 @@ interface HeaderProps {
   onDownloaderTabChange?: (tab: DownloaderTab | null) => void;
 }
 
-export default function Header({ activeDownloaderTab, onDownloaderTabChange }: HeaderProps) {
+export default function Header({ activeDownloaderTab }: HeaderProps) {
   const { t, lang, setLang } = useLanguage();
   const pathname = usePathname();
-  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -110,14 +110,14 @@ export default function Header({ activeDownloaderTab, onDownloaderTabChange }: H
   return (
     <>
       <header
-        className={`fixed top-0 z-50 w-full transition-all duration-300 ${
+        className={`sticky top-0 z-50 w-full transition-all duration-200 ${
           scrolled
-            ? "bg-bg-elevated/85 backdrop-blur-xl border-b border-border/60 shadow-[var(--shadow-xs)]"
-            : "bg-transparent border-b border-transparent"
+            ? "bg-bg-elevated/90 backdrop-blur-xl border-b border-border/60 shadow-[var(--shadow-xs)]"
+            : "bg-bg/85 backdrop-blur-xl border-b border-border/40"
         }`}
       >
-        <div className="site-header-inner mx-auto flex h-[72px] max-w-[1200px] items-center justify-between gap-2 px-4 sm:px-6 lg:px-12">
-          <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2 text-fg no-underline sm:gap-2.5" aria-label={t.footer.homeLabel}>
+        <div className="site-header-inner mx-auto flex h-[72px] max-w-[1240px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 xl:px-12">
+          <Link href="/" className="flex shrink-0 items-center gap-2 text-fg no-underline sm:gap-2.5" aria-label={t.footer.homeLabel}>
             <span
               className="site-logo-badge flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[12px] text-white"
               style={{ background: "var(--brand-gradient)", boxShadow: "0 4px 16px rgba(124,77,245,0.30)" }}
@@ -129,16 +129,16 @@ export default function Header({ activeDownloaderTab, onDownloaderTabChange }: H
             </span>
           </Link>
 
-          <nav className="hidden xl:flex items-center gap-1" aria-label="Instagram downloaders">
-            <Link href="/instagram-reels-downloader" className="rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-fg-muted hover:bg-primary-light hover:text-primary transition-colors">Instagram Reels Downloader</Link>
-            <Link href="/instagram-video-downloader" className="rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-fg-muted hover:bg-primary-light hover:text-primary transition-colors">Instagram Video Downloader</Link>
-            <Link href="/instagram-photo-downloader" className="rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-fg-muted hover:bg-primary-light hover:text-primary transition-colors">Instagram Photo Downloader</Link>
-            <Link href="/instagram-story-downloader" className="rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-fg-muted hover:bg-primary-light hover:text-primary transition-colors">Instagram Story Downloader</Link>
-            <Link href="/instagram-highlights-downloader" className="hidden 2xl:inline-flex rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-fg-muted hover:bg-primary-light hover:text-primary transition-colors">Instagram Highlights Downloader</Link>
-            <Link href="/instagram-audio-downloader" className="hidden 2xl:inline-flex rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-fg-muted hover:bg-primary-light hover:text-primary transition-colors">Instagram Audio Downloader</Link>
-          </nav>
-
-          <div className="site-controls flex min-w-0 shrink-0 items-center gap-0.5 sm:gap-6">
+          <div className="site-controls flex shrink-0 items-center gap-1 sm:gap-1.5">
+            {/* Desktop nav: downloader selector + section links */}
+            <div className="hidden lg:flex items-center gap-0.5 xl:gap-1 mr-2">
+              <ToolCategoryDropdown />
+              <nav className="flex items-center gap-0.5 xl:gap-1" aria-label="Site sections">
+                <Link href="/#how-it-works" className="rounded-full px-3 py-1.5 text-[14.5px] font-medium text-fg-muted hover:bg-primary-light hover:text-primary transition-colors whitespace-nowrap">How It Works</Link>
+                <Link href="/#faq" className="rounded-full px-3 py-1.5 text-[14.5px] font-medium text-fg-muted hover:bg-primary-light hover:text-primary transition-colors whitespace-nowrap">FAQ</Link>
+                <a href={SUPPORT_GMAIL_URL} target="_blank" rel="noopener noreferrer" className="rounded-full px-3 py-1.5 text-[14.5px] font-medium text-fg-muted hover:bg-primary-light hover:text-primary transition-colors whitespace-nowrap">Contact</a>
+              </nav>
+            </div>
             <div className="relative" ref={langRef}>
               <button
                 type="button"
@@ -150,6 +150,7 @@ export default function Header({ activeDownloaderTab, onDownloaderTabChange }: H
               >
                 <Globe className="h-5 w-5 shrink-0" strokeWidth={1.8} />
                 <span className="hidden sm:inline">{current.short}</span>
+                <ChevronDown className="hidden sm:inline h-3.5 w-3.5 shrink-0 opacity-60 transition-transform duration-200" style={{ transform: langOpen ? "rotate(180deg)" : "rotate(0deg)" }} strokeWidth={2} aria-hidden="true" />
               </button>
 
               {langOpen && (
@@ -269,7 +270,6 @@ export default function Header({ activeDownloaderTab, onDownloaderTabChange }: H
             ["/instagram-video-downloader", "Instagram Video Downloader", Video, "bg-primary-light"] as const,
             ["/instagram-photo-downloader", "Instagram Photo Downloader", ImageIcon, "bg-orange-500/10"] as const,
             ["/instagram-story-downloader", "Instagram Story Downloader", Clock, "bg-sky-500/10"] as const,
-            ["/instagram-highlights-downloader", "Instagram Highlights Downloader", Star, "bg-amber-500/10"] as const,
             ["/instagram-audio-downloader", "Instagram Audio Downloader", Music2, "bg-emerald-500/10"] as const,
           ]).map(([href, label, Icon, bg]) => {
             const active = pathname === href;

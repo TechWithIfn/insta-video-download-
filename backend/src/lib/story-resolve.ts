@@ -164,10 +164,10 @@ function validateInstagramCookie(): { valid: boolean; reason?: string } {
   return { valid: true };
 }
 
-function buildHeaders(opts: { includeCookie?: boolean } = {}): Record<string, string> {
+function buildHeaders(opts: { includeCookie?: boolean; useDesktop?: boolean } = {}): Record<string, string> {
   const headers: Record<string, string> = {
-    "User-Agent": MOBILE_UA,
-    Accept: "application/json, text/plain, */*",
+    "User-Agent": opts.useDesktop ? DESKTOP_UA : MOBILE_UA,
+    Accept: opts.useDesktop ? "*/*" : "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9",
     "X-IG-App-ID": IG_APP_ID,
     Referer: "https://www.instagram.com/",
@@ -186,9 +186,9 @@ function buildHeaders(opts: { includeCookie?: boolean } = {}): Record<string, st
   return headers;
 }
 
-function buildHtmlHeaders(): Record<string, string> {
+function buildHtmlHeaders(useDesktop = false): Record<string, string> {
   return {
-    "User-Agent": MOBILE_UA,
+    "User-Agent": useDesktop ? DESKTOP_UA : MOBILE_UA,
     Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
     Referer: "https://www.instagram.com/",
@@ -198,7 +198,7 @@ function buildHtmlHeaders(): Record<string, string> {
 async function fetchJsonWithStatus(
   url: string,
   tag: string,
-  opts: { includeCookie?: boolean; state?: StoryResolveState } = {}
+  opts: { includeCookie?: boolean; state?: StoryResolveState; useDesktop?: boolean } = {}
 ): Promise<{ status: number; json: unknown | null; textSnippet: string | null }> {
   // Rate-limit guard: do not make another API request after 429
   if (opts.state && shouldBlockApiRequest(opts.state)) {
@@ -216,7 +216,7 @@ async function fetchJsonWithStatus(
   }
   try {
     const res = await fetch(url, {
-      headers: buildHeaders(opts),
+      headers: buildHeaders({ includeCookie: opts.includeCookie, useDesktop: opts.useDesktop }),
       signal: controller.signal,
       redirect: "follow",
     });
@@ -261,7 +261,8 @@ async function fetchJsonWithStatus(
 async function fetchHtmlWithStatus(
   url: string,
   tag: string,
-  state?: StoryResolveState
+  state?: StoryResolveState,
+  useDesktop: boolean = false
 ): Promise<{ status: number | null; html: string | null; finalUrl: string | null }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -273,7 +274,7 @@ async function fetchHtmlWithStatus(
   }
   try {
     const res = await fetch(url, {
-      headers: buildHtmlHeaders(),
+      headers: buildHtmlHeaders(useDesktop),
       signal: controller.signal,
       redirect: "follow",
     });
@@ -1191,7 +1192,7 @@ async function resolveHighlightById(highlightId: string, originalUrl: string, st
         highlightId,
         hasCookie: isInstagramCookieConfigured(),
       });
-      const { html, status, finalUrl } = await fetchHtmlWithStatus(pageUrl, "highlight_page_html", state);
+      const { html, status, finalUrl } = await fetchHtmlWithStatus(pageUrl, "highlight_page_html", state, true);
       // Debug: log response details (status, content-type via fetchHtml, first 1000 chars)
       const ct = html ? "text/html" : "none";
       const snippet = html ? html.slice(0, 1000).replace(/\s+/g, " ").slice(0, 1000) : "no-html";
@@ -1259,7 +1260,7 @@ async function resolveHighlightById(highlightId: string, originalUrl: string, st
     }
     if (tryUseCookie && !isInstagramCookieConfigured()) continue;
     const tag = tryUseCookie ? "highlight_reels_media_authed" : "highlight_reels_media_public";
-    const result = await fetchJsonWithStatus(reelsUrl, tag, { includeCookie: tryUseCookie, state });
+    const result = await fetchJsonWithStatus(reelsUrl, tag, { includeCookie: tryUseCookie, state, useDesktop: true });
     // DEBUG: log response details (status, content-type via result, first 1000 chars)
     const snippet = result.textSnippet ? result.textSnippet.slice(0, 1000).replace(/\s+/g, " ").slice(0, 1000) : "no-json";
     const isLoginRedirect = result.status === 302 || (result.textSnippet?.includes("/accounts/login") ?? false);
@@ -1327,7 +1328,7 @@ async function resolveHighlightById(highlightId: string, originalUrl: string, st
   // Strategy 3: If server-side session is configured, try authenticated highlight fetch as final fallback
   if (useCookie && state && !shouldBlockApiRequest(state)) {
     try {
-      const authedResult = await fetchJsonWithStatus(reelsUrl, "highlight_reels_media_authed_final", { includeCookie: true, state });
+      const authedResult = await fetchJsonWithStatus(reelsUrl, "highlight_reels_media_authed_final", { includeCookie: true, state, useDesktop: true });
       if (authedResult.status === 200 && authedResult.json) {
         const items = parseReelsMediaResponse(authedResult.json);
         if (items.length > 0) {

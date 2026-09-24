@@ -51,7 +51,6 @@ export const ml: Strings = {
     videos: "വീഡിയോകൾ",
     photos: "ഫോട്ടോകൾ",
     stories: "സ്റ്റോറികൾ",
-    highlights: "ഹൈലൈറ്റുകൾ",
     audio: "ഓഡിയോ",
   },
   typeBadges: {
@@ -59,7 +58,6 @@ export const ml: Strings = {
     post: "പോസ്റ്റ്",
     carousel: "കറൗസൽ",
     story: "സ്റ്റോറി",
-    highlight: "ഹൈലൈറ്റ്",
     video: "വീഡിയോ",
     photo: "ഫോട്ടോ",
     content: "ഉള്ളടക്കം",
@@ -118,10 +116,6 @@ export const ml: Strings = {
       {
         title: "സ്റ്റോറികൾ",
         desc: "ഏത് പ്രൊഫൈലിന്റെയും പൊതു സ്റ്റോറികൾ അപ്രത്യക്ഷമാകും മുൻപ് പിടിക്കൂ.",
-      },
-      {
-        title: "ഹൈലൈറ്റുകൾ",
-        desc: "പൊതു Instagram പ്രൊഫൈലുകളുടെ സേവ് ചെയ്ത ഹൈലൈറ്റ് ശേഖരങ്ങൾ, ഒന്നിച്ച്.",
       },
       {
         title: "ഓഡിയോ",
@@ -353,3 +347,4 @@ export const ml: Strings = {
     supportBtn: "ഇമെയിൽ സഹായം",
   },
 };
+

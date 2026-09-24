@@ -51,7 +51,6 @@ export const as: Strings = {
     videos: "ভিডিঅ’",
     photos: "ফট’",
     stories: "ষ্ট’ৰি",
-    highlights: "হাইলাইটছ",
     audio: "অডিঅ’",
   },
   typeBadges: {
@@ -59,7 +58,6 @@ export const as: Strings = {
     post: "প’ষ্ট",
     carousel: "কেৰ’ছেল",
     story: "ষ্ট’ৰি",
-    highlight: "হাইলাইট",
     video: "ভিডিঅ’",
     photo: "ফট’",
     content: "কন্টেন্ট",
@@ -118,10 +116,6 @@ export const as: Strings = {
       {
         title: "ষ্ট’ৰি",
         desc: "যিকোনো প্ৰ’ফাইলৰ ৰাজহুৱা ষ্ট’ৰি, নোহোৱা হোৱাৰ আগতেই ধৰক।",
-      },
-      {
-        title: "হাইলাইটছ",
-        desc: "ৰাজহুৱা Instagram প্ৰ’ফাইলৰ সংৰক্ষিত হাইলাইট সংগ্ৰহ, একেলগে।",
       },
       {
         title: "অডিঅ’",
@@ -353,3 +347,4 @@ export const as: Strings = {
     supportBtn: "ইমেইল সহায়",
   },
 };
+

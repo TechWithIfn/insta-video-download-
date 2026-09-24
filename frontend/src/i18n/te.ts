@@ -51,7 +51,6 @@ export const te: Strings = {
     videos: "వీడియోలు",
     photos: "ఫోటోలు",
     stories: "స్టోరీలు",
-    highlights: "హైలైట్స్",
     audio: "ఆడియో",
   },
   typeBadges: {
@@ -59,7 +58,6 @@ export const te: Strings = {
     post: "పోస్ట్",
     carousel: "కెరోసెల్",
     story: "స్టోరీ",
-    highlight: "హైలైట్",
     video: "వీడియో",
     photo: "ఫోటో",
     content: "కంటెంట్",
@@ -118,10 +116,6 @@ export const te: Strings = {
       {
         title: "స్టోరీలు",
         desc: "ఏ ప్రొఫైల్ పబ్లిక్ స్టోరీలనైనా అదృశ్యమయ్యేలోపు పట్టుకోండి.",
-      },
-      {
-        title: "హైలైట్స్",
-        desc: "పబ్లిక్ Instagram ప్రొఫైళ్ల సేవ్ చేసిన హైలైట్ సేకరణలు, ఒక్కసారే.",
       },
       {
         title: "ఆడియో",
@@ -353,3 +347,4 @@ export const te: Strings = {
     supportBtn: "ఈమెయిల్ సహాయం",
   },
 };
+

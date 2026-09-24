@@ -7,7 +7,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/instagram-reels-downloader", priority: 0.9, changeFreq: "monthly" },
     { path: "/instagram-video-downloader", priority: 0.9, changeFreq: "monthly" },
     { path: "/instagram-photo-downloader", priority: 0.9, changeFreq: "monthly" },
-    { path: "/instagram-highlights-downloader", priority: 0.8, changeFreq: "monthly" },
     { path: "/instagram-story-downloader", priority: 0.8, changeFreq: "monthly" },
     { path: "/instagram-audio-downloader", priority: 0.8, changeFreq: "monthly" },
     { path: "/help", priority: 0.5, changeFreq: "yearly" },

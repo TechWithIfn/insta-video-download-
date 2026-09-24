@@ -74,7 +74,6 @@ export interface Strings {
     videos: string;
     photos: string;
     stories: string;
-    highlights: string;
     audio: string;
   };
   typeBadges: {
@@ -82,7 +81,6 @@ export interface Strings {
     post: string;
     carousel: string;
     story: string;
-    highlight: string;
     video: string;
     photo: string;
     content: string;
@@ -104,7 +102,7 @@ export interface Strings {
     eyebrow: string;
     title: string;
     subtitle: string;
-    items: [TextPair, TextPair, TextPair, TextPair, TextPair, TextPair, TextPair];
+    items: [TextPair, TextPair, TextPair, TextPair, TextPair, TextPair];
   };
   why: {
     eyebrow: string;

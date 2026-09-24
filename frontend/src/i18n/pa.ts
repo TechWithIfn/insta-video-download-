@@ -51,7 +51,6 @@ export const pa: Strings = {
     videos: "ਵੀਡੀਓ",
     photos: "ਫੋਟੋ",
     stories: "ਸਟੋਰੀਜ਼",
-    highlights: "ਹਾਈਲਾਈਟਸ",
     audio: "ਆਡੀਓ",
   },
   typeBadges: {
@@ -59,7 +58,6 @@ export const pa: Strings = {
     post: "ਪੋਸਟ",
     carousel: "ਕੈਰੋਸਲ",
     story: "ਸਟੋਰੀ",
-    highlight: "ਹਾਈਲਾਈਟ",
     video: "ਵੀਡੀਓ",
     photo: "ਫੋਟੋ",
     content: "ਸਮੱਗਰੀ",
@@ -118,10 +116,6 @@ export const pa: Strings = {
       {
         title: "ਸਟੋਰੀਜ਼",
         desc: "ਕਿਸੇ ਵੀ ਪ੍ਰੋਫਾਈਲ ਦੀਆਂ ਜਨਤਕ ਸਟੋਰੀਜ਼, ਗਾਇਬ ਹੋਣ ਤੋਂ ਪਹਿਲਾਂ ਫੜੋ।",
-      },
-      {
-        title: "ਹਾਈਲਾਈਟਸ",
-        desc: "ਜਨਤਕ Instagram ਪ੍ਰੋਫਾਈਲਾਂ ਦੇ ਸਾਂਭੇ ਹੋਏ ਹਾਈਲਾਈਟ ਸੰਗ੍ਰਹਿ, ਇਕੱਠੇ।",
       },
       {
         title: "ਆਡੀਓ",
@@ -353,3 +347,4 @@ export const pa: Strings = {
     supportBtn: "ਈਮੇਲ ਸਹਾਇਤਾ",
   },
 };
+

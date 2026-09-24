@@ -51,7 +51,6 @@ export const mr: Strings = {
     videos: "व्हिडिओ",
     photos: "फोटो",
     stories: "स्टोरीज",
-    highlights: "हायलाइट्स",
     audio: "ऑडिओ",
   },
   typeBadges: {
@@ -59,7 +58,6 @@ export const mr: Strings = {
     post: "पोस्ट",
     carousel: "कॅरोसेल",
     story: "स्टोरी",
-    highlight: "हायलाइट",
     video: "व्हिडिओ",
     photo: "फोटो",
     content: "कंटेंट",
@@ -118,10 +116,6 @@ export const mr: Strings = {
       {
         title: "स्टोरीज",
         desc: "कोणत्याही प्रोफाइलच्या सार्वजनिक स्टोरीज, नाहीशा होण्यापूर्वी पकडा.",
-      },
-      {
-        title: "हायलाइट्स",
-        desc: "सार्वजनिक Instagram प्रोफाइलचे जतन केलेले हायलाइट संग्रह, एकदम.",
       },
       {
         title: "ऑडिओ",
@@ -353,3 +347,4 @@ export const mr: Strings = {
     supportBtn: "ईमेल मदत",
   },
 };
+
