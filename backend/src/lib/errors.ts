@@ -162,6 +162,46 @@ export const ERRORS: Record<ErrorCode, { message: string; status: number; retrya
     status: 502,
     retryable: false,
   },
+  STORY_MEDIA_NOT_FOUND: {
+    message: "The actual Story media could not be resolved.",
+    status: 404,
+    retryable: false,
+  },
+  INSTAGRAM_AUTH_NOT_CONFIGURED: {
+    message: "Instagram Story extraction requires a configured server-side session.",
+    status: 503,
+    retryable: false,
+  },
+  INSTAGRAM_AUTH_INVALID: {
+    message: "Instagram authentication is invalid or expired. Please refresh the server session.",
+    status: 401,
+    retryable: false,
+  },
+  STORY_NOT_FOUND: {
+    message: "Story not found. It may have been deleted or never existed.",
+    status: 404,
+    retryable: false,
+  },
+  STORY_EXPIRED: {
+    message: "This Story has expired. Stories are only available for 24 hours.",
+    status: 410,
+    retryable: false,
+  },
+  STORY_PRIVATE: {
+    message: "This Story is from a private account and cannot be accessed.",
+    status: 403,
+    retryable: false,
+  },
+  INSTAGRAM_RATE_LIMITED: {
+    message: "Instagram is rate-limiting requests. Please try again shortly.",
+    status: 429,
+    retryable: true,
+  },
+  INSTAGRAM_PROVIDER_ERROR: {
+    message: "Instagram provider error. Please try again shortly.",
+    status: 502,
+    retryable: true,
+  },
 };
 
 export function createError(code: ErrorCode): AppError {

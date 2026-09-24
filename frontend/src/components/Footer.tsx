@@ -38,13 +38,12 @@ export default function Footer() {
   const year = new Date().getFullYear();
 
   const PRODUCT_LINKS = [
-    { label: t.common.home, href: "/#hero" },
-    { label: t.tabs.reels, href: "/#hero" },
-    { label: t.tabs.videos, href: "/#hero" },
-    { label: t.tabs.photos, href: "/#hero" },
-    { label: t.tabs.stories, href: "/#hero" },
-    { label: t.tabs.highlights, href: "/#hero" },
-    { label: t.tabs.audio, href: "/#hero" },
+    { label: "Instagram Reels Downloader", href: "/instagram-reels-downloader" },
+    { label: "Instagram Video Downloader", href: "/instagram-video-downloader" },
+    { label: "Instagram Photo Downloader", href: "/instagram-photo-downloader" },
+    { label: "Instagram Highlights Downloader", href: "/instagram-highlights-downloader" },
+    { label: "Instagram Story Downloader", href: "/instagram-story-downloader" },
+    { label: "Instagram Audio Downloader", href: "/instagram-audio-downloader" },
   ];
 
   const RESOURCE_LINKS = [

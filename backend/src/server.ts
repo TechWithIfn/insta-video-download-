@@ -1,4 +1,12 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "path";
+// Load server-side Instagram session from config/.env (project root) and backend/.env
+// config/.env is the dedicated file for sessionid/csrftoken as per Highlight fix spec
+try {
+  dotenv.config({ path: path.resolve(process.cwd(), "../config/.env") });
+  dotenv.config({ path: path.resolve(process.cwd(), "config/.env") });
+  dotenv.config(); // also load backend/.env (default)
+} catch {}
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
 import { getProvider } from "./lib/providers/index.js";

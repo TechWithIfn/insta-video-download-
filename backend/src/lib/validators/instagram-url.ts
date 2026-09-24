@@ -126,10 +126,12 @@ function detectContentTypeFromPath(pathname: string): string | null {
     return "POST";
   }
   if (segments[0] === "tv") return "VIDEO";
-  if (segments[0] === "stories") {
+  if (segments[0] === "stories" || segments[0] === "story") {
     if (segments.includes("highlights")) return "HIGHLIGHT";
     return segments.length >= 3 ? "STORY" : null;
   }
+  // Short share links like /s/<code> that sometimes wrap story shares
+  if (segments[0] === "s" && segments.length >= 2) return "STORY";
   if (segments[0] === "explore") return null;
 
   return null;
@@ -148,23 +150,33 @@ function extractShortcode(pathname: string): string | null {
 
 function extractStoryUsername(pathname: string): string | null {
   const segments = pathname.split("/").filter(Boolean);
-  if (segments[0]?.toLowerCase() === "stories" && segments.length >= 3 && segments[1]) {
+  const first = segments[0]?.toLowerCase();
+  if ((first === "stories" || first === "story") && segments.length >= 3 && segments[1]) {
     return segments[1];
+  }
+  if (first === "s" && segments.length >= 2) {
+    // Short links don't encode username; return null and let resolver handle via redirect
+    return null;
   }
   return null;
 }
 
 function extractStoryId(pathname: string): string | null {
   const segments = pathname.split("/").filter(Boolean);
-  if (segments[0]?.toLowerCase() === "stories" && segments.length >= 3 && segments[1].toLowerCase() !== "highlights") {
+  const first = segments[0]?.toLowerCase();
+  if ((first === "stories" || first === "story") && segments.length >= 3 && segments[1].toLowerCase() !== "highlights") {
     return segments[2] || null;
+  }
+  if (first === "s" && segments.length >= 2) {
+    return segments[1] || null;
   }
   return null;
 }
 
 function extractHighlightId(pathname: string): string | null {
   const segments = pathname.split("/").filter(Boolean);
-  if (segments[0]?.toLowerCase() === "stories" && segments.some((segment) => segment.toLowerCase() === "highlights")) {
+  const first = segments[0]?.toLowerCase();
+  if ((first === "stories" || first === "story") && segments.some((segment) => segment.toLowerCase() === "highlights")) {
     const highlightIdx = segments.findIndex((segment) => segment.toLowerCase() === "highlights");
     return segments[highlightIdx + 1] || null;
   }

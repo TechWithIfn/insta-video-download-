@@ -33,9 +33,9 @@ export const en: Strings = {
   },
   hero: {
     badge: "Fast · Free · No login required",
-    titleA: "Downloadit – Instagram",
-    titleB: "Media Downloader",
-    subtitle: "Download public Instagram videos, Reels and photos with Downloadit. Paste a link, preview your media and save it to your device.",
+    titleA: "Instagram Downloader –",
+    titleB: "Reels, Videos, Photos & Audio",
+    subtitle: "Download public Instagram Reels, videos, photos, Highlights and audio with Downloadit. Preview media and save it to your device quickly — no login required.",
     cardTitle: "Paste an Instagram Link",
     placeholder: "https://www.instagram.com/reel/...",
     audioPlaceholder: "https://www.instagram.com/reel/...",
@@ -173,32 +173,40 @@ export const en: Strings = {
     subtitle: "Quick answers to what people usually ask.",
     items: [
       {
-        q: "Does Downloadit require login?",
-        a: "No. Downloadit works with public links only — no account, login, or password needed.",
+        q: "How do I download an Instagram Reel without login?",
+        a: "Copy the public Reels link from Instagram, paste it into Downloadit, and tap Get Media. Preview the MP4 and save it to your phone — no login or app install required.",
       },
       {
-        q: "Which Instagram links are supported?",
-        a: "Public posts, reels, videos, photos, carousels, stories, and highlights. Private content is never supported.",
+        q: "Can I download Instagram videos as MP4?",
+        a: "Yes. Paste a public Instagram video link and Downloadit returns the original MP4. Use it as an Instagram video to MP4 converter for phone or desktop.",
       },
       {
-        q: "Where are downloaded files saved?",
-        a: "Files are saved to your device's default downloads folder — just like any browser download.",
+        q: "How do I download Instagram photos in original quality?",
+        a: "Paste a public photo or carousel link. Downloadit shows each slide as JPG/PNG in original quality. Navigate with Next/Previous and save any image.",
       },
       {
-        q: "Is the media stored on Downloadit?",
-        a: "No. Media is streamed directly and not permanently stored. Temporary links expire quickly, so download while available.",
+        q: "Can I download Instagram Highlights?",
+        a: "Yes, if the Highlights are from a profile you can view publicly. Paste a Highlights link, preview each item, and download MP4 for videos or JPG for images.",
       },
       {
-        q: "Why can a media link expire?",
-        a: "Instagram CDN links are temporary and signed. After a short time they expire — just resolve the original URL again for a fresh link.",
+        q: "How does the Instagram story downloader work?",
+        a: "Stories expire after 24 hours. Paste a public story link before it expires, preview the story image or video, and save it. Private or expired stories show a clear error.",
       },
       {
-        q: "Why might a download fail?",
-        a: "The post may be private or deleted, the link expired, the network dropped, or the content type isn't supported. Check the link and try again.",
+        q: "How do I download Instagram audio as MP3?",
+        a: "Switch to the Audio tab, paste a public Reels or video link, and Downloadit extracts the sound as MP3. Works as Instagram reel audio downloader and music downloader online.",
       },
       {
-        q: "How does Audio mode work?",
-        a: "Select the Audio tab, paste a public video link, and Downloadit extracts the audio as an MP3 using server-side processing.",
+        q: "What formats are supported?",
+        a: "Videos and Reels → MP4 (Instagram MP4 download), photos → JPG/PNG/WebP, audio → MP3 (Instagram MP3 download). Highlights and stories keep their original image or video format.",
+      },
+      {
+        q: "Is Downloadit free and does it require login?",
+        a: "Yes, Downloadit is a free Instagram downloader online and an Instagram downloader no login tool. It works only with links you can view publicly without signing in.",
+      },
+      {
+        q: "Why might a download fail for public content?",
+        a: "Links are temporary and expire quickly, or the post was deleted or made private/restricted. The backend reports the actual category (private/expired/blocked) — resolve the original URL again for a fresh link.",
       },
     ],
   },

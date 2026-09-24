@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Globe, HelpCircle, Sun, Moon, Download, Menu, X, Check, Home as HomeIcon, Film, Video, Image as ImageIcon, Music2, Star, Lightbulb, CircleHelp, Shield, FileText, Mail } from "lucide-react";
+import { Globe, HelpCircle, Sun, Moon, Download, Menu, X, Check, Home as HomeIcon, Film, Video, Image as ImageIcon, Music2, Star, Clock, Lightbulb, CircleHelp, Shield, FileText, Mail } from "lucide-react";
 import { useLanguage, LANGUAGES } from "@/i18n";
 import { SUPPORT_GMAIL_URL } from "@/config/site";
 import type { DownloaderTab } from "@/components/HeroDownloader";
@@ -31,7 +31,6 @@ export default function Header({ activeDownloaderTab, onDownloaderTabChange }: H
   const [scrolled, setScrolled] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [langOpen, setLangOpen] = useState(false);
-  const [manuallySelectedTab, setManuallySelectedTab] = useState<DownloaderTab | null>(null);
   const mountedRef = useRef(false);
   const langRef = useRef<HTMLDivElement>(null);
 
@@ -89,7 +88,6 @@ export default function Header({ activeDownloaderTab, onDownloaderTabChange }: H
   }, [langOpen]);
 
   const closeMobileMenu = useCallback(() => {
-    setManuallySelectedTab(null);
     setMobileOpen(false);
   }, []);
 
@@ -103,15 +101,6 @@ export default function Header({ activeDownloaderTab, onDownloaderTabChange }: H
   }, [mobileOpen, closeMobileMenu]);
 
   const handleNavClick = closeMobileMenu;
-  const handleDownloaderTabClick = useCallback((tab: DownloaderTab) => {
-    setManuallySelectedTab(tab);
-    if (onDownloaderTabChange) {
-      onDownloaderTabChange(tab);
-    } else {
-      router.push(`/?tab=${tab}#hero`);
-    }
-    closeMobileMenu();
-  }, [closeMobileMenu, onDownloaderTabChange, router]);
   const toggleTheme = () => setTheme((t) => (t === "light" ? "dark" : "light"));
   const isDark = theme === "dark";
 
@@ -139,6 +128,15 @@ export default function Header({ activeDownloaderTab, onDownloaderTabChange }: H
               Download<span className="text-primary">it</span>
             </span>
           </Link>
+
+          <nav className="hidden xl:flex items-center gap-1" aria-label="Instagram downloaders">
+            <Link href="/instagram-reels-downloader" className="rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-fg-muted hover:bg-primary-light hover:text-primary transition-colors">Instagram Reels Downloader</Link>
+            <Link href="/instagram-video-downloader" className="rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-fg-muted hover:bg-primary-light hover:text-primary transition-colors">Instagram Video Downloader</Link>
+            <Link href="/instagram-photo-downloader" className="rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-fg-muted hover:bg-primary-light hover:text-primary transition-colors">Instagram Photo Downloader</Link>
+            <Link href="/instagram-story-downloader" className="rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-fg-muted hover:bg-primary-light hover:text-primary transition-colors">Instagram Story Downloader</Link>
+            <Link href="/instagram-highlights-downloader" className="hidden 2xl:inline-flex rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-fg-muted hover:bg-primary-light hover:text-primary transition-colors">Instagram Highlights Downloader</Link>
+            <Link href="/instagram-audio-downloader" className="hidden 2xl:inline-flex rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-fg-muted hover:bg-primary-light hover:text-primary transition-colors">Instagram Audio Downloader</Link>
+          </nav>
 
           <div className="site-controls flex min-w-0 shrink-0 items-center gap-0.5 sm:gap-6">
             <div className="relative" ref={langRef}>
@@ -234,10 +232,7 @@ export default function Header({ activeDownloaderTab, onDownloaderTabChange }: H
             <button
               type="button"
               className="site-menu-btn flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-fg-muted transition-colors hover:bg-primary-light hover:text-primary lg:hidden"
-              onClick={() => {
-                setManuallySelectedTab(null);
-                setMobileOpen(true);
-              }}
+              onClick={() => setMobileOpen(true)}
               aria-label={t.header.openMenu}
               aria-expanded={mobileOpen}
             >
@@ -270,24 +265,25 @@ export default function Header({ activeDownloaderTab, onDownloaderTabChange }: H
             <span>Home</span>
           </Link>
           {([
-            ["reels", "Download Reels", Film, "text-pink-500", "bg-pink-500/10"],
-            ["videos", "Download Video", Video, "text-primary", "bg-primary-light"],
-            ["photos", "Download Photos", ImageIcon, "text-orange-500", "bg-orange-500/10"],
-            ["audio", "Download Audio", Music2, "text-emerald-500", "bg-emerald-500/10"],
-            ["highlights", "Download Highlights", Star, "text-amber-500", "bg-amber-500/10"],
-          ] as const).map(([tab, label, Icon]) => {
-            const active = manuallySelectedTab === tab && activeDownloaderTab === tab;
+            ["/instagram-reels-downloader", "Instagram Reels Downloader", Film, "bg-pink-500/10"] as const,
+            ["/instagram-video-downloader", "Instagram Video Downloader", Video, "bg-primary-light"] as const,
+            ["/instagram-photo-downloader", "Instagram Photo Downloader", ImageIcon, "bg-orange-500/10"] as const,
+            ["/instagram-story-downloader", "Instagram Story Downloader", Clock, "bg-sky-500/10"] as const,
+            ["/instagram-highlights-downloader", "Instagram Highlights Downloader", Star, "bg-amber-500/10"] as const,
+            ["/instagram-audio-downloader", "Instagram Audio Downloader", Music2, "bg-emerald-500/10"] as const,
+          ]).map(([href, label, Icon, bg]) => {
+            const active = pathname === href;
             return (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => handleDownloaderTabClick(tab)}
+              <Link
+                key={href}
+                href={href}
+                onClick={handleNavClick}
                 className={`flex min-h-[44px] w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-[15px] font-semibold transition-colors hover:bg-primary-light hover:text-primary ${active ? "bg-primary-light text-primary" : "text-fg"}`}
-                aria-current={active ? "true" : undefined}
+                aria-current={active ? "page" : undefined}
               >
-                <span className={`mobile-nav-icon ${["bg-pink-500/10", "bg-primary-light", "bg-orange-500/10", "bg-emerald-500/10", "bg-amber-500/10"][(["reels", "videos", "photos", "audio", "highlights"] as const).indexOf(tab)]}`}><Icon className="h-[18px] w-[18px]" /></span>
+                <span className={`mobile-nav-icon ${bg}`}><Icon className="h-[18px] w-[18px]" /></span>
                 <span>{label}</span>
-              </button>
+              </Link>
             );
           })}
           <div className="my-2 border-t border-border-light" />

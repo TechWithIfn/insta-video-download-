@@ -3,6 +3,7 @@ import { createProvider } from "../providers/index.js";
 import { getCachedResult, setCachedResult, deleteCachedResult } from "../provider-cache.js";
 import { enrichMediaItems } from "../media-enrich.js";
 import { resolveAudioPage, isAudioPageUrl } from "../audio-resolve.js";
+import { resolveStoryUrl, isStoryOrHighlightUrl } from "../story-resolve.js";
 import { hashUrl } from "../crypto.js";
 import { logger } from "../logger.js";
 
@@ -138,6 +139,34 @@ export async function resolveUrl(
       const audio = await resolveAudioPage(url, onProgress);
       const media = await enrichMediaItems(audio.media);
       const result: ResolverResult = { ...audio, media };
+      setCachedResult(url, result);
+      return result;
+    }
+
+    // Stories and Highlights use a dedicated API-based resolver that is
+    // Vercel-compatible (pure fetch, no browser) and correctly handles
+    // story-specific endpoints (reels_media) with optional session cookie.
+    // This must run BEFORE the generic provider, which treats stories as
+    // generic post pages and hits Instagram's login wall.
+    // When the mock provider is active (tests/dev), let it handle stories
+    // so deterministic mock data is preserved.
+    const providerName = process.env.RESOLVER_PROVIDER || "placeholder";
+    if (isStoryOrHighlightUrl(url) && providerName !== "mock") {
+      logger.info("Resolving via dedicated story resolver", { url: url.slice(0, 80) });
+      const storyResult = await resolveStoryUrl(url, onProgress);
+      const normalized = normalizeResultType(storyResult);
+      const unique = dedupeExactUrls(normalized.media);
+      const enriched = await enrichMediaItems(unique);
+      const media = dedupeMediaItems(enriched);
+      const result: ResolverResult = { ...normalized, media };
+      logger.info("Story resolve normalized", {
+        type: result.type,
+        discovered: normalized.media.length,
+        exactDupesRemoved: normalized.media.length - unique.length,
+        renditionsRemoved: unique.length - media.length,
+        finalCount: media.length,
+        url: url.slice(0, 80),
+      });
       setCachedResult(url, result);
       return result;
     }

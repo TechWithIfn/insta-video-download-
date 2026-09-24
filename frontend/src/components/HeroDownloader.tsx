@@ -338,23 +338,20 @@ function VideoPlayer({ src, poster, mediaType, width, height, onDurationChange, 
           onClick={togglePlay}
         />
 
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            togglePlay();
-          }}
-          className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full backdrop-blur-md transition-transform hover:scale-105 active:scale-95 sm:h-16 sm:w-16"
-          style={{ background: "rgba(255,255,255,0.18)", border: "1.5px solid rgba(255,255,255,0.25)" }}
-          aria-label={playing ? "Pause video" : t.result.playVideo}
-          aria-pressed={playing}
-        >
-          {playing ? (
-            <Pause className="h-6 w-6 text-white" fill="white" strokeWidth={0} />
-          ) : (
+        {!playing && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              togglePlay();
+            }}
+            className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full backdrop-blur-md transition-transform hover:scale-105 active:scale-95 sm:h-16 sm:w-16"
+            style={{ background: "rgba(255,255,255,0.18)", border: "1.5px solid rgba(255,255,255,0.25)" }}
+            aria-label={t.result.playVideo}
+          >
             <Play className="ml-1 h-6 w-6 text-white" fill="white" strokeWidth={0} />
-          )}
-        </button>
+          </button>
+        )}
       </div>
 
       {/* Progress bar + time + mute */}
@@ -633,6 +630,28 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   const safeIndex = items.length === 0 ? 0 : Math.min(currentIndex, items.length - 1);
   const currentMedia = items[safeIndex] ?? null;
   const isAudio = mode === "audio";
+
+  // Frontend safety: NEVER display profile/avatar as Story media
+  const isProfileImageUrlFrontend = (u: string) => {
+    try {
+      const url = new URL(u);
+      const p = url.pathname.toLowerCase();
+      const s = (url.search + url.hash).toLowerCase();
+      if (p.includes("s150x150") || p.includes("s320x320") || p.includes("profile_pic") || p.includes("avatar")) return true;
+      if (/\/t51\.[^/]+-19\//.test(p)) return true;
+      if (s.includes("150x150") || s.includes("320x320")) return true;
+      return false;
+    } catch {
+      return false;
+    }
+  };
+  const isProfileMediaFrontend = Boolean(
+    currentMedia &&
+      (isProfileImageUrlFrontend(currentMedia.url) ||
+        (currentMedia.width === 206 && currentMedia.height === 206) ||
+        (currentMedia.type === "image" && currentMedia.width === 150 && currentMedia.height === 150))
+  );
+  const isStoryProfileFallback = result.type === "STORY" && isProfileMediaFrontend;
   // Carousel controls ONLY for real carousel posts. Reels, single videos,
   // single photos, stories, highlights and audio never show a counter/arrows —
   // even if the backend returned more than one media item for them.
@@ -646,6 +665,70 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
     setRealDuration(null);
     setRealResolution(null);
   }, []);
+
+  // ── Carousel flicker fix: keep current image visible until next is preloaded ──
+  // Stable container + Image() preload prevents white/black flash and layout shift.
+  // Only `currentIndex` (hence currentMedia) is changed, and only after the
+  // target src has loaded. Rapid clicks are de-duplicated via version counter.
+  const carouselVersionRef = useRef(0);
+  const carouselTargetRef = useRef<number | null>(null);
+
+  const preloadAndSwitch = useCallback(
+    (targetIndex: number) => {
+      if (targetIndex < 0 || targetIndex >= items.length) return;
+      const safe = Math.min(currentIndex, items.length - 1);
+      if (targetIndex === safe && carouselTargetRef.current === null) return;
+      const version = ++carouselVersionRef.current;
+      carouselTargetRef.current = targetIndex;
+      const targetMedia = items[targetIndex];
+      if (!targetMedia || targetMedia.type === "video") {
+        // Video slides are handled by VideoPlayer (remount is cheap and video
+        // has its own poster); switch immediately without preload.
+        setCurrentIndex(targetIndex);
+        resetPerItemState();
+        carouselTargetRef.current = null;
+        return;
+      }
+      const targetSrc = getStreamUrl(targetMedia.url, result.sourceUrl);
+      const img = new Image();
+      img.onload = () => {
+        if (carouselVersionRef.current !== version) return;
+        // Switch only when target is decoded and cached → no flash
+        setCurrentIndex(targetIndex);
+        setImgSrc(null);
+        setImgFailed(false);
+        imgRetriedRef.current = false;
+        // Do not reset video-only states abruptly for images
+        carouselTargetRef.current = null;
+      };
+      img.onerror = () => {
+        if (carouselVersionRef.current !== version) return;
+        // Still switch to let retry/error UI appear, avoiding blank
+        setCurrentIndex(targetIndex);
+        setImgSrc(null);
+        setImgFailed(false);
+        imgRetriedRef.current = false;
+        carouselTargetRef.current = null;
+      };
+      img.src = targetSrc;
+    },
+    [items, result.sourceUrl, currentIndex, resetPerItemState]
+  );
+
+  // Preload neighbours after a slide is displayed (instant next navigation)
+  useEffect(() => {
+    if (!isCarouselPost || items.length <= 1) return;
+    const preload = (idx: number) => {
+      if (idx < 0 || idx >= items.length) return;
+      const m = items[idx];
+      if (!m || m.type === "video") return;
+      const src = getStreamUrl(m.url, result.sourceUrl);
+      const img = new Image();
+      img.src = src;
+    };
+    preload(safeIndex + 1);
+    preload(safeIndex - 1);
+  }, [safeIndex, isCarouselPost, items, result.sourceUrl]);
 
   // For audio mode: fetch the MP3 from the backend
   useEffect(() => {
@@ -751,13 +834,13 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   }, [currentMedia, streamSrc, logPreviewDiag]);
 
   const goPrev = useCallback(() => {
-    resetPerItemState();
-    setCurrentIndex((i) => Math.max(0, i - 1));
-  }, [resetPerItemState]);
+    const target = Math.max(0, (carouselTargetRef.current ?? safeIndex) - 1);
+    preloadAndSwitch(target);
+  }, [safeIndex, preloadAndSwitch]);
   const goNext = useCallback(() => {
-    resetPerItemState();
-    setCurrentIndex((i) => Math.min(items.length - 1, i + 1));
-  }, [items.length, resetPerItemState]);
+    const target = Math.min(items.length - 1, (carouselTargetRef.current ?? safeIndex) + 1);
+    preloadAndSwitch(target);
+  }, [safeIndex, items.length, preloadAndSwitch]);
 
   const effW = realResolution?.w ?? currentMedia?.width ?? null;
   const effH = realResolution?.h ?? currentMedia?.height ?? null;
@@ -779,6 +862,34 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
     }
     previewRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, []);
+
+  // Strict validation: for Story, never show profile/avatar as success
+  if (isStoryProfileFallback) {
+    return (
+      <div className="result-card animate-fade-in-up mx-auto mt-6 w-[calc(100%-32px)] max-w-[900px] sm:mt-10 sm:w-full sm:px-5">
+        <div
+          className="overflow-hidden rounded-[28px] p-4 sm:p-5 text-center"
+          style={{ background: "var(--card)", boxShadow: "0 20px 60px rgba(60,40,120,0.12)", border: "1px solid var(--border)" }}
+        >
+          <div className="flex flex-col items-center gap-3 py-6">
+            <AlertCircle className="h-10 w-10 text-danger" />
+            <p className="text-[15px] font-semibold text-danger">The actual Story media could not be resolved.</p>
+            <p className="max-w-[420px] text-[13.5px] leading-[1.6] text-fg-muted">
+              Instagram did not expose the requested Story media. The Story may have expired, been removed, or is not publicly accessible. Please try a different Story link or verify the Story is still viewable publicly.
+            </p>
+            <button
+              type="button"
+              onClick={onReset}
+              className="mt-2 inline-flex min-h-[44px] items-center justify-center rounded-xl px-5 text-[14px] font-semibold text-white"
+              style={{ background: "var(--brand-gradient)" }}
+            >
+              Try another link
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="result-card animate-fade-in-up mx-auto mt-6 w-[calc(100%-32px)] max-w-[900px] sm:mt-10 sm:w-full sm:px-5">

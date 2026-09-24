@@ -20,15 +20,22 @@ const lora = Lora({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: BRAND_TITLE,
+  title: {
+    default: BRAND_TITLE,
+    template: `%s | ${BRAND_NAME}`,
+  },
   description: BRAND_DESCRIPTION,
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     title: BRAND_TITLE,
     description: BRAND_DESCRIPTION,
     type: "website",
     siteName: BRAND_NAME,
-    url: `${SITE_URL}/`,
-    images: [{ url: "/og-downloadit.png", width: 1200, height: 630, alt: "Downloadit Instagram media downloader" }],
+    url: SITE_URL,
+    locale: "en_US",
+    images: [{ url: "/og-downloadit.png", width: 1200, height: 630, alt: "Downloadit — Instagram Downloader for Reels, Videos, Photos, Highlights and Audio" }],
   },
   twitter: {
     card: "summary_large_image",
@@ -75,7 +82,6 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <link rel="canonical" href={`${SITE_URL}/`} />
         <Script
           id="website-structured-data"
           type="application/ld+json"
@@ -85,7 +91,40 @@ export default function RootLayout({
               "@type": "WebSite",
               name: BRAND_NAME,
               alternateName: ["Downloadit.pro", "Downloadit Instagram Downloader"],
-              url: `${SITE_URL}/`,
+              url: SITE_URL,
+            }),
+          }}
+        />
+        <Script
+          id="organization-structured-data"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: BRAND_NAME,
+              url: SITE_URL,
+              logo: `${SITE_URL}/og-downloadit.png`,
+            }),
+          }}
+        />
+        <Script
+          id="webapp-structured-data"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebApplication",
+              name: BRAND_NAME,
+              url: SITE_URL,
+              applicationCategory: "MultimediaApplication",
+              operatingSystem: "Any",
+              description: BRAND_DESCRIPTION,
+              offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "USD",
+              },
             }),
           }}
         />
