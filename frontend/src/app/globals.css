@@ -5,13 +5,19 @@
   --bg-elevated: #ffffff;
   --fg: #14141c;
   --fg-muted: #5b5b6e;
-  --fg-subtle: #8a8a9c;
+  /* #6e6d80 is the lightest gray passing WCAG 1.4.3 (4.5:1) on both white
+     cards (5.05) and the page background (4.61). Do not lighten. */
+  --fg-subtle: #6e6d80;
   --border: rgba(20, 20, 40, 0.08);
   --border-light: #f0eeeb;
   --card: #ffffff;
   --card-hover: #fefefe;
   --primary: #7c4df5;
   --primary-hover: #6a3de0;
+  /* Small text on tinted surfaces must use --primary-strong (#6a3de0 passes
+     4.5:1 on the primary tint, white, and page bg). --primary itself stays
+     for graphics, borders, and large/white-on-brand uses. */
+  --primary-strong: #6a3de0;
   --primary-light: rgba(124, 77, 245, 0.10);
   --primary-faint: #f5f3ff;
   --accent: #ec5fa8;
@@ -49,7 +55,7 @@
   --radius-xl: 20px;
   --radius-2xl: 24px;
   --radius-card: 20px;
-  --radius-pill: 999px;
+  --radius-pill: 9999px;
   --font-sans: var(--font-poppins), system-ui, -apple-system, sans-serif;
   --font-accent: var(--font-lora), Georgia, serif;
 }
@@ -66,6 +72,7 @@
   --color-card-hover: var(--card-hover);
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
+  --color-primary-strong: var(--primary-strong);
   --color-primary-light: var(--primary-light);
   --color-primary-faint: var(--primary-faint);
   --color-accent: var(--accent);
@@ -90,13 +97,16 @@
   --bg-elevated: rgba(255, 255, 255, 0.05);
   --fg: #f4f3fa;
   --fg-muted: #a9a8bc;
-  --fg-subtle: #6c6a80;
+  /* Dark surface equivalent: #8f8da3 passes 4.5:1 on the dark bg (5.99)
+     and dark cards (5.61). */
+  --fg-subtle: #8f8da3;
   --border: rgba(255, 255, 255, 0.08);
   --border-light: rgba(255, 255, 255, 0.06);
   --card: rgba(255, 255, 255, 0.05);
   --card-hover: rgba(255, 255, 255, 0.08);
   --primary: #a17dff;
   --primary-hover: #b89cff;
+  --primary-strong: #b89cff;
   --primary-light: rgba(161, 125, 255, 0.15);
   --primary-faint: rgba(161, 125, 255, 0.08);
   --accent: #f479c0;
@@ -188,7 +198,7 @@ body::after {
   position: fixed;
   pointer-events: none;
   z-index: 0;
-  border-radius: 50%;
+  border-radius: 9999px;
 }
 
 body::before {
@@ -229,6 +239,22 @@ button:focus-visible {
   box-shadow: var(--shadow-focus);
 }
 
+/* WCAG 1.4.1: links inside prose are underlined (not color-only), so they
+   are distinguishable from surrounding text without relying on color.
+   Card/block navigation links are unaffected (not inside p/li). */
+main p a[href],
+main li a[href] {
+  text-decoration: underline;
+  text-decoration-color: rgba(124, 77, 245, 0.45);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+main p a[href]:hover,
+main li a[href]:hover {
+  text-decoration-color: var(--primary);
+}
+
 /* Gradient button */
 .gradient-btn {
   display: inline-flex;
@@ -240,7 +266,7 @@ button:focus-visible {
   font-family: var(--font-sans);
   font-weight: 600;
   border: none;
-  border-radius: 14px;
+  border-radius: 16px;
   padding: 14px 32px;
   cursor: pointer;
   box-shadow: var(--shadow-brand);
@@ -284,7 +310,7 @@ button:focus-visible {
   left: 3px;
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: 9999px;
   background: var(--brand-gradient);
   display: flex;
   align-items: center;

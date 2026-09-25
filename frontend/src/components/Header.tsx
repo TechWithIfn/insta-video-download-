@@ -111,7 +111,7 @@ export default function Header({ activeDownloaderTab }: HeaderProps) {
   const isDark = theme === "dark";
 
   const iconBtn =
-    "site-icon-btn flex h-11 min-w-[44px] items-center justify-center gap-1.5 rounded-xl px-2 text-[15px] font-medium text-fg-muted transition-colors hover:bg-primary-light hover:text-primary sm:h-auto sm:w-auto sm:hover:bg-transparent";
+    "site-icon-btn flex h-11 min-w-[44px] items-center justify-center gap-1.5 rounded-xl px-2 text-[16px] font-medium text-fg-muted transition-colors hover:bg-primary-light hover:text-primary sm:h-auto sm:w-auto sm:hover:bg-transparent";
 
   return (
     <>
@@ -125,12 +125,12 @@ export default function Header({ activeDownloaderTab }: HeaderProps) {
         <div className="site-header-inner mx-auto flex h-[72px] max-w-[1240px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 xl:px-12">
           <Link href="/" className="flex shrink-0 items-center gap-2 text-fg no-underline sm:gap-2.5" aria-label={t.footer.homeLabel}>
             <span
-              className="site-logo-badge flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[12px] text-white"
+              className="site-logo-badge flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl text-white"
               style={{ background: "var(--brand-gradient)", boxShadow: "0 4px 16px rgba(124,77,245,0.30)" }}
             >
               <Download className="h-5 w-5" strokeWidth={2.2} />
             </span>
-            <span className="site-logo-text truncate text-[22px] font-bold tracking-[-0.01em]">
+            <span className="site-logo-text truncate text-[24px] font-bold tracking-[-0.01em]">
               Download<span className="text-primary">it</span>
             </span>
           </Link>
@@ -140,9 +140,9 @@ export default function Header({ activeDownloaderTab }: HeaderProps) {
             <div className="hidden lg:flex items-center gap-0.5 xl:gap-1 mr-2">
               <ToolCategoryDropdown />
               <nav className="flex items-center gap-0.5 xl:gap-1" aria-label="Site sections">
-                <Link href="/#how-it-works" className="rounded-full px-3 py-1.5 text-[14.5px] font-medium text-fg-muted hover:bg-primary-light hover:text-primary transition-colors whitespace-nowrap">How It Works</Link>
-                <Link href="/#faq" className="rounded-full px-3 py-1.5 text-[14.5px] font-medium text-fg-muted hover:bg-primary-light hover:text-primary transition-colors whitespace-nowrap">FAQ</Link>
-                <a href={SUPPORT_GMAIL_URL} target="_blank" rel="noopener noreferrer" className="rounded-full px-3 py-1.5 text-[14.5px] font-medium text-fg-muted hover:bg-primary-light hover:text-primary transition-colors whitespace-nowrap">Contact</a>
+                <Link href="/#how-it-works" className="rounded-full px-3 py-1.5 text-[14px] font-medium text-fg-muted hover:bg-primary-light hover:text-primary transition-colors whitespace-nowrap">How It Works</Link>
+                <Link href="/#faq" className="rounded-full px-3 py-1.5 text-[14px] font-medium text-fg-muted hover:bg-primary-light hover:text-primary transition-colors whitespace-nowrap">FAQ</Link>
+                <a href={SUPPORT_GMAIL_URL} target="_blank" rel="noopener noreferrer" className="rounded-full px-3 py-1.5 text-[14px] font-medium text-fg-muted hover:bg-primary-light hover:text-primary transition-colors whitespace-nowrap">Contact</a>
               </nav>
             </div>
             <div className="relative" ref={langRef}>
@@ -186,7 +186,7 @@ export default function Header({ activeDownloaderTab }: HeaderProps) {
                           setLang(l.code);
                           setLangOpen(false);
                         }}
-                        className="flex min-h-[44px] w-full items-center gap-2.5 rounded-xl px-3 text-left text-[14.5px] transition-colors hover:bg-primary-light"
+                        className="flex min-h-[44px] w-full items-center gap-2.5 rounded-xl px-3 text-left text-[14px] transition-colors hover:bg-primary-light"
                         style={{
                           background: active ? "var(--primary-light)" : "transparent",
                           color: active ? "var(--primary)" : "var(--fg)",
@@ -257,21 +257,21 @@ export default function Header({ activeDownloaderTab }: HeaderProps) {
 
       <div
         id="downloadit-mobile-menu"
-        className={`mobile-drawer fixed inset-y-0 right-0 z-50 flex h-full w-[min(82vw,380px)] flex-col overflow-hidden rounded-l-[28px] bg-bg-elevated shadow-[var(--shadow-xl)] transition-transform duration-300 ease-out lg:hidden ${mobileOpen ? "translate-x-0 pointer-events-auto" : "translate-x-full pointer-events-none"}`}
+        className={`mobile-drawer fixed inset-y-0 right-0 z-50 flex h-full w-[min(82vw,380px)] flex-col overflow-hidden rounded-l-[24px] bg-bg-elevated shadow-[var(--shadow-xl)] transition-transform duration-300 ease-out lg:hidden ${mobileOpen ? "translate-x-0 pointer-events-auto" : "translate-x-full pointer-events-none"}`}
         role="dialog" aria-modal="true" aria-hidden={!mobileOpen} aria-label={t.common.mobileNav}
         inert={!mobileOpen}
       >
         <div className="mobile-drawer-header flex h-[68px] shrink-0 items-center justify-between border-b border-border px-5">
           <div>
             <span className="block text-[16px] font-bold text-fg">Downloadit</span>
-            <span className="block text-[11px] font-medium text-fg-subtle">{t.common.mobileNav}</span>
+            <span className="block text-[12px] font-medium text-fg-subtle">{t.common.mobileNav}</span>
           </div>
           <button type="button" autoFocus={mobileOpen} className="flex h-10 w-10 items-center justify-center rounded-xl text-fg-muted transition-colors hover:bg-primary-light hover:text-primary" onClick={() => { closeMobileMenu(); menuButtonRef.current?.focus(); }} aria-label={t.header.closeMenu}>
             <X className="h-5 w-5" />
           </button>
         </div>
         <nav className="mobile-drawer-nav flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain p-4" aria-label={t.common.mobileNav}>
-          <Link href="/#hero" onClick={handleNavClick} className={`flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-semibold transition-colors hover:bg-primary-light hover:text-primary ${pathname === "/" && !activeDownloaderTab ? "bg-primary-light text-primary" : "text-fg"}`}>
+          <Link href="/#hero" onClick={handleNavClick} className={`flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[16px] font-semibold transition-colors hover:bg-primary-light hover:text-primary ${pathname === "/" && !activeDownloaderTab ? "bg-primary-light text-primary-strong" : "text-fg"}`}>
             <span className="mobile-nav-icon bg-primary-light text-primary"><HomeIcon className="h-[18px] w-[18px]" /></span>
             <span>Home</span>
           </Link>
@@ -288,7 +288,7 @@ export default function Header({ activeDownloaderTab }: HeaderProps) {
                 key={href}
                 href={href}
                 onClick={handleNavClick}
-                className={`flex min-h-[44px] w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-[15px] font-semibold transition-colors hover:bg-primary-light hover:text-primary ${active ? "bg-primary-light text-primary" : "text-fg"}`}
+                className={`flex min-h-[44px] w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-[16px] font-semibold transition-colors hover:bg-primary-light hover:text-primary ${active ? "bg-primary-light text-primary-strong" : "text-fg"}`}
                 aria-current={active ? "page" : undefined}
               >
                 <span className={`mobile-nav-icon ${bg}`}><Icon className="h-[18px] w-[18px]" /></span>
@@ -297,20 +297,20 @@ export default function Header({ activeDownloaderTab }: HeaderProps) {
             );
           })}
           <div className="my-2 border-t border-border-light" />
-          <Link href="/#how-it-works" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
-            <span className="mobile-nav-icon bg-violet-500/10 text-violet-500"><Lightbulb className="h-[18px] w-[18px]" /></span>
+          <Link href="/#how-it-works" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[16px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
+            <span className="mobile-nav-icon bg-violet-500/10 text-primary"><Lightbulb className="h-[18px] w-[18px]" /></span>
             <span>How It Works</span>
           </Link>
-          <Link href="/#faq" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
-            <span className="mobile-nav-icon bg-indigo-500/10 text-indigo-500"><CircleHelp className="h-[18px] w-[18px]" /></span>
+          <Link href="/#faq" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[16px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
+            <span className="mobile-nav-icon bg-indigo-500/10 text-primary"><CircleHelp className="h-[18px] w-[18px]" /></span>
             <span>FAQ</span>
           </Link>
-          <a href={SUPPORT_GMAIL_URL} target="_blank" rel="noopener noreferrer" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
-            <span className="mobile-nav-icon bg-rose-500/10 text-rose-500"><Mail className="h-[18px] w-[18px]" /></span>
+          <a href={SUPPORT_GMAIL_URL} target="_blank" rel="noopener noreferrer" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[16px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
+            <span className="mobile-nav-icon bg-rose-500/10 text-primary"><Mail className="h-[18px] w-[18px]" /></span>
             <span>Contact</span>
           </a>
-          <Link href="/help" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
-            <span className="mobile-nav-icon bg-sky-500/10 text-sky-500"><HelpCircle className="h-[18px] w-[18px]" /></span>
+          <Link href="/help" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[16px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
+            <span className="mobile-nav-icon bg-sky-500/10 text-primary"><HelpCircle className="h-[18px] w-[18px]" /></span>
             <span>Help</span>
           </Link>
           <div className="my-2 border-t border-border-light" />
@@ -327,7 +327,7 @@ export default function Header({ activeDownloaderTab }: HeaderProps) {
                   type="button"
                   onClick={() => setLang(l.code)}
                   aria-pressed={active}
-                  className={`flex min-h-[40px] items-center rounded-xl px-3 text-[13.5px] font-semibold transition-colors ${active ? "bg-primary-light text-primary" : "text-fg-muted hover:bg-primary-light hover:text-primary"}`}
+                  className={`flex min-h-[44px] items-center gap-1.5 rounded-2xl px-3 text-[14px] font-semibold transition-colors ${active ? "bg-primary-light text-primary" : "text-fg-muted hover:bg-primary-light hover:text-primary"}`}
                 >
                   {active ? <Check className="mr-1.5 h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" /> : null}
                   {l.short}
@@ -340,24 +340,24 @@ export default function Header({ activeDownloaderTab }: HeaderProps) {
             onClick={toggleTheme}
             aria-pressed={isDark}
             aria-label={isDark ? t.header.themeToLight : t.header.themeToDark}
-            className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-[15px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary"
+            className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-[16px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary"
           >
-            <span className="mobile-nav-icon bg-amber-500/10 text-amber-500">
+            <span className="mobile-nav-icon bg-amber-500/10 text-primary">
               {isDark ? <Moon className="h-[18px] w-[18px]" /> : <Sun className="h-[18px] w-[18px]" />}
             </span>
             <span className="flex-1">{isDark ? t.header.themeToLight : t.header.themeToDark}</span>
           </button>
-          <Link href="/privacy" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
-            <span className="mobile-nav-icon bg-teal-500/10 text-teal-500"><Shield className="h-[18px] w-[18px]" /></span>
+          <Link href="/privacy" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[16px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
+            <span className="mobile-nav-icon bg-teal-500/10 text-primary"><Shield className="h-[18px] w-[18px]" /></span>
             <span>Privacy</span>
           </Link>
-          <Link href="/terms" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
-            <span className="mobile-nav-icon bg-slate-500/10 text-slate-500"><FileText className="h-[18px] w-[18px]" /></span>
+          <Link href="/terms" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[16px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
+            <span className="mobile-nav-icon bg-slate-500/10 text-primary"><FileText className="h-[18px] w-[18px]" /></span>
             <span>Terms</span>
           </Link>
         </nav>
         <div className="mobile-drawer-cta shrink-0 border-t border-border p-4 pb-[calc(1rem+var(--sab))]">
-          <Link href="/#hero" onClick={handleNavClick} className="flex min-h-[48px] items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[15px] font-bold text-white shadow-[var(--shadow-brand)] transition-transform active:scale-[0.98]" style={{ background: "var(--brand-gradient)" }}>
+          <Link href="/#hero" onClick={handleNavClick} className="flex min-h-[48px] items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[16px] font-bold text-white shadow-[var(--shadow-brand)] transition-transform active:scale-[0.98]" style={{ background: "var(--brand-gradient)" }}>
             <Download className="h-4 w-4" />
             <span>{t.common.startDownloading}</span>
             <span aria-hidden="true">→</span>

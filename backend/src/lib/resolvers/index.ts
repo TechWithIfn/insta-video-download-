@@ -111,9 +111,14 @@ export async function resolveUrl(
   opts?: ResolveOptions
 ): Promise<ResolverResult> {
   if (!opts?.bypassCache) {
+    const lookupStart = Date.now();
     const cached = getCachedResult(url);
     if (cached) {
-      logger.info("Cache hit", { url: url.slice(0, 80) });
+      logger.info("Cache hit", {
+        url: url.slice(0, 80),
+        cacheHit: true,
+        lookupMs: Date.now() - lookupStart,
+      });
       onProgress?.(90, "Cached result found");
       return cached;
     }
@@ -132,6 +137,10 @@ export async function resolveUrl(
   }
 
   const promise = (async () => {
+    // Phase timings below feed the dev observability logs: provider network
+    // latency vs local enrichment vs cache lookup, so a slow resolve can be
+    // attributed instead of guessed.
+    const resolveStart = Date.now();
     // Direct audio pages NEVER go through the post/reel resolver: they carry
     // no playable media of their own and need the dedicated audio lookup.
     if (isAudioPageUrl(url)) {
@@ -139,6 +148,12 @@ export async function resolveUrl(
       const audio = await resolveAudioPage(url, onProgress);
       const media = await enrichMediaItems(audio.media);
       const result: ResolverResult = { ...audio, media };
+      logger.info("Audio resolve normalized", {
+        type: result.type,
+        finalCount: result.media.length,
+        resolveMs: Date.now() - resolveStart,
+        url: url.slice(0, 80),
+      });
       setCachedResult(url, result);
       return result;
     }
@@ -165,6 +180,7 @@ export async function resolveUrl(
         exactDupesRemoved: normalized.media.length - unique.length,
         renditionsRemoved: unique.length - media.length,
         finalCount: media.length,
+        resolveMs: Date.now() - resolveStart,
         url: url.slice(0, 80),
       });
       setCachedResult(url, result);
@@ -194,6 +210,7 @@ export async function resolveUrl(
       exactDupesRemoved: normalized.media.length - unique.length,
       renditionsRemoved: unique.length - media.length,
       finalCount: media.length,
+      resolveMs: Date.now() - resolveStart,
       url: url.slice(0, 80),
     });
     setCachedResult(url, result);

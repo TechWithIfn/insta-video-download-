@@ -72,6 +72,20 @@ export function validateProxyUrl(raw: unknown): { ok: true; value: ValidatedUrl 
   return { ok: true, value: { url: decoded, hostname } };
 }
 
+/**
+ * CDN identity of a media URL: rotating signatures live in the query
+ * string, while host + pathname identify the underlying media bytes.
+ */
+function sameCdnIdentity(a: string, b: string): boolean {
+  try {
+    const ua = new URL(a);
+    const ub = new URL(b);
+    return ua.hostname === ub.hostname && ua.pathname === ub.pathname;
+  } catch {
+    return false;
+  }
+}
+
 export function getClientIp(req: Request): string {
   return (
     (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
@@ -97,6 +111,19 @@ export type UpstreamStatus =
   | { kind: "bad-redirect"; location: string }
   | { kind: "network-error"; message: string };
 
+/**
+ * Single bounded retry for transient transport failures (connection reset /
+ * refused / DNS): one retry after a short backoff, same URL, then give up.
+ * Never retries timeouts (the full budget was already spent), HTTP statuses
+ * (expiry recovery owns those), or redirect errors (deterministic). Keeps
+ * the worst case to 2 attempts — never a retry loop.
+ */
+const RETRY_DELAY_MS = 400;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function fetchUpstreamMedia(
   initialUrl: string,
   options: { timeoutMs: number; rangeHeader?: string; tag: string; requestId: string }
@@ -105,31 +132,45 @@ export async function fetchUpstreamMedia(
   let currentUrl = initialUrl;
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    let response: Response | null = null;
+    let hopFailure: UpstreamStatus | null = null;
 
-    let response: Response;
-    try {
-      const headers: Record<string, string> = { ...UPSTREAM_HEADERS };
-      if (rangeHeader) {
-        headers.Range = rangeHeader;
+    for (let attempt = 0; attempt <= 1; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const headers: Record<string, string> = { ...UPSTREAM_HEADERS };
+        if (rangeHeader) {
+          headers.Range = rangeHeader;
+        }
+        response = await fetch(currentUrl, {
+          signal: controller.signal,
+          headers,
+          redirect: "manual",
+        });
+        clearTimeout(timeout);
+        break;
+      } catch (err) {
+        clearTimeout(timeout);
+        if (err instanceof Error && err.name === "AbortError") {
+          logger.warn(`[${tag}] upstream timeout`, { requestId, url: currentUrl.slice(0, 120) });
+          hopFailure = { kind: "timeout" };
+          break;
+        }
+        const message = err instanceof Error ? err.message : "unknown";
+        if (attempt === 0) {
+          logger.warn(`[${tag}] upstream network error, retrying once`, { requestId, message });
+          await sleep(RETRY_DELAY_MS);
+          continue;
+        }
+        logger.warn(`[${tag}] upstream network error`, { requestId, message });
+        hopFailure = { kind: "network-error", message };
+        break;
       }
-      response = await fetch(currentUrl, {
-        signal: controller.signal,
-        headers,
-        redirect: "manual",
-      });
-    } catch (err) {
-      clearTimeout(timeout);
-      if (err instanceof Error && err.name === "AbortError") {
-        logger.warn(`[${tag}] upstream timeout`, { requestId, url: currentUrl.slice(0, 120) });
-        return { kind: "timeout" };
-      }
-      const message = err instanceof Error ? err.message : "unknown";
-      logger.warn(`[${tag}] upstream network error`, { requestId, message });
-      return { kind: "network-error", message };
-    } finally {
-      clearTimeout(timeout);
+    }
+
+    if (hopFailure || !response) {
+      return hopFailure ?? { kind: "network-error", message: "unknown" };
     }
 
     if (response.status >= 300 && response.status < 400) {
@@ -246,7 +287,20 @@ export async function fetchUpstreamMediaResilient(
   let freshUrl: string | null = null;
   try {
     const result = await resolveUrl(validation.parsed.normalized, undefined, { bypassCache: true });
-    const candidate = result.media[0]?.url;
+    // Pick the refreshed candidate for the SAME media item: rotating CDN
+    // signatures keep the media identity in host+pathname, so prefer the
+    // item whose identity matches the expired URL. Blindly using media[0]
+    // would serve slide 1 when slide N expired (wrong bytes on download).
+    const identityMatch = result.media.find(
+      (m) =>
+        typeof m.url === "string" &&
+        m.url !== initialUrl &&
+        sameCdnIdentity(m.url, initialUrl)
+    );
+    const fallback = result.media.find(
+      (m) => typeof m.url === "string" && m.url !== initialUrl
+    );
+    const candidate = identityMatch?.url ?? fallback?.url;
     if (typeof candidate === "string" && candidate.length > 0) {
       const mediaValidation = validateProxyUrl(candidate);
       if (mediaValidation.ok && mediaValidation.value.url !== initialUrl) {

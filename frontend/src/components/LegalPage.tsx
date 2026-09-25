@@ -22,11 +22,11 @@ export default function LegalPage({
       <h1 className="mt-4 text-[clamp(26px,4vw,40px)] font-bold tracking-[-0.02em] text-fg">
         {title}
       </h1>
-      <p className="mt-2 text-[13.5px] text-fg-subtle">Last updated: {updated}</p>
-      <div className="mt-6 flex flex-col gap-4 text-[15px] leading-[1.75] text-fg-muted">
+      <p className="mt-2 text-[14px] text-fg-subtle">Last updated: {updated}</p>
+      <div className="mt-6 flex flex-col gap-4 text-[16px] leading-[1.75] text-fg-muted">
         {children}
       </div>
-      <p className="mt-8 text-[15px] text-fg-muted">
+      <p className="mt-8 text-[16px] text-fg-muted">
         Questions about this page? Contact us at{" "}
         <a
           href={SUPPORT_GMAIL_URL}

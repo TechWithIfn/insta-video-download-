@@ -24,7 +24,7 @@ const TYPE_ICONS = [Play, Film, ImageIcon, Clock, Star, Music];
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-[22px] font-bold tracking-[-0.01em] text-fg sm:text-[26px]">
+    <h2 className="text-[24px] font-bold tracking-[-0.01em] text-fg sm:text-[26px]">
       {children}
     </h2>
   );
@@ -65,7 +65,7 @@ function Accordion({
               aria-controls={`${idPrefix}-answer-${i}`}
               className="flex w-full items-center justify-between gap-4 py-5 px-6 text-left transition-colors"
             >
-              <span className="text-[15.5px] font-semibold text-fg pr-2">{item.q}</span>
+              <span className="text-[16px] font-semibold text-fg pr-2">{item.q}</span>
               <ChevronDown
                 className="h-[18px] w-[18px] shrink-0 transition-transform duration-250"
                 style={{
@@ -84,7 +84,7 @@ function Accordion({
                 padding: isOpen ? "0 24px 20px" : "0 24px",
               }}
             >
-              <p className="text-[14.5px] leading-[1.65] text-fg-muted">{item.a}</p>
+              <p className="text-[14px] leading-[1.65] text-fg-muted">{item.a}</p>
             </div>
           </div>
         );
@@ -136,12 +136,12 @@ export default function HelpClient() {
                 {h.steps.map((step, i) => (
                   <li key={i} className="flex items-start gap-3.5">
                     <span
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-[14px] font-bold text-white"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[14px] font-bold text-white"
                       style={{ background: "var(--brand-gradient)" }}
                     >
                       {i + 1}
                     </span>
-                    <p className="pt-1 text-[15px] leading-[1.65] text-fg-muted">{step}</p>
+                    <p className="pt-1 text-[16px] leading-[1.65] text-fg-muted">{step}</p>
                   </li>
                 ))}
               </ol>
@@ -162,7 +162,7 @@ export default function HelpClient() {
                       style={{ background: "var(--bg)" }}
                     >
                       <span
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
                         style={{ background: "var(--accent-tint-purple)", border: "1px solid var(--accent-tint-purple-border)" }}
                       >
                         <Icon size={17} color="var(--primary)" strokeWidth={2} />
@@ -180,7 +180,7 @@ export default function HelpClient() {
           <ScrollReveal>
             <section className="mt-8 rounded-[24px] p-7 sm:p-9" style={{ background: "var(--card)", boxShadow: "var(--shadow-card)", border: "1px solid var(--border)" }}>
               <SectionTitle>{h.s3title}</SectionTitle>
-              <p className="mt-3 text-[15px] leading-[1.7] text-fg-muted">{h.s3desc}</p>
+              <p className="mt-3 text-[16px] leading-[1.7] text-fg-muted">{h.s3desc}</p>
               <div className="mt-6 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
                 {h.flow.map((step, i) => (
                   <div key={i} className="flex flex-col items-center gap-2 sm:flex-1 sm:flex-row sm:justify-center">
@@ -210,12 +210,12 @@ export default function HelpClient() {
                 {h.s4steps.map((step, i) => (
                   <li key={i} className="flex items-start gap-3.5">
                     <span
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-[14px] font-bold text-white"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-[14px] font-bold text-white"
                       style={{ background: "var(--brand-gradient)" }}
                     >
                       {i + 1}
                     </span>
-                    <p className="pt-1 text-[15px] leading-[1.65] text-fg-muted">{step}</p>
+                    <p className="pt-1 text-[16px] leading-[1.65] text-fg-muted">{step}</p>
                   </li>
                 ))}
               </ol>
@@ -240,7 +240,7 @@ export default function HelpClient() {
                 {h.privacy.map((item, i) => (
                   <li key={i} className="flex items-start gap-3">
                     <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--primary)" }} strokeWidth={2} />
-                    <p className="text-[15px] leading-[1.65] text-fg-muted">{item}</p>
+                    <p className="text-[16px] leading-[1.65] text-fg-muted">{item}</p>
                   </li>
                 ))}
               </ul>
@@ -263,15 +263,15 @@ export default function HelpClient() {
               className="mt-8 rounded-[24px] p-8 text-center sm:p-10"
               style={{ background: "var(--card)", boxShadow: "var(--shadow-card)", border: "1px solid var(--border)" }}
             >
-              <h2 className="text-[22px] font-bold text-fg sm:text-[26px]">{h.supportTitle}</h2>
-              <p className="mx-auto mt-3 max-w-[420px] text-[15px] leading-[1.7] text-fg-muted">
+              <h2 className="text-[24px] font-bold text-fg sm:text-[26px]">{h.supportTitle}</h2>
+              <p className="mx-auto mt-3 max-w-[420px] text-[16px] leading-[1.7] text-fg-muted">
                 {h.supportDesc}
               </p>
-              <a href={SUPPORT_GMAIL_URL} target="_blank" rel="noopener noreferrer" className="gradient-btn mt-6 min-h-[48px] px-8 text-[15px]">
+              <a href={SUPPORT_GMAIL_URL} target="_blank" rel="noopener noreferrer" className="gradient-btn mt-6 min-h-[48px] px-8 text-[16px]">
                 <Mail className="h-5 w-5" />
                 {h.supportBtn}
               </a>
-              <p className="mt-4 text-[14.5px] text-fg-muted">
+              <p className="mt-4 text-[14px] text-fg-muted">
                 <a
                   href={SUPPORT_GMAIL_URL}
                   target="_blank"

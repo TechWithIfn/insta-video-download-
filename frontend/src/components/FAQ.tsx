@@ -31,16 +31,13 @@ export default function FAQ() {
       <section id="faq" className="px-4 py-20 sm:px-6 sm:py-28 lg:px-8" aria-label={t.faq.title}>
       <div className="mx-auto max-w-[720px]">
         <div className="mb-14 text-center">
-          <p
-            className="mb-3 text-[13px] font-bold uppercase tracking-[0.12em]"
-            style={{ background: "var(--brand-gradient-text)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}
-          >
+          <p className="mb-3 text-[14px] font-bold uppercase tracking-[0.12em] text-primary-strong">
             {t.faq.eyebrow}
           </p>
-          <h2 className="text-3xl font-bold tracking-[-0.02em] text-fg sm:text-[40px]">
+          <h2 className="text-[28px] font-bold tracking-[-0.02em] text-fg sm:text-[40px]">
             {t.faq.title}
           </h2>
-          <p className="mx-auto mt-4 max-w-[400px] text-[17px] leading-relaxed text-fg-muted">
+          <p className="mx-auto mt-4 max-w-[400px] text-[18px] leading-relaxed text-fg-muted">
             {t.faq.subtitle}
           </p>
         </div>
@@ -61,11 +58,12 @@ export default function FAQ() {
                 <button
                   type="button"
                   onClick={() => toggle(i)}
+                  id={`faq-question-${i}`}
                   aria-expanded={isOpen}
                   aria-controls={`faq-answer-${i}`}
                   className="flex w-full items-center justify-between gap-4 py-5 px-6 text-left transition-colors"
                 >
-                  <span className="text-[15.5px] font-semibold text-fg pr-2">{item.q}</span>
+                  <span className="text-[16px] font-semibold text-fg pr-2">{item.q}</span>
                   <ChevronDown
                     className="h-[18px] w-[18px] shrink-0 transition-transform duration-250"
                     style={{
@@ -76,7 +74,7 @@ export default function FAQ() {
                 </button>
                 <div
                   id={`faq-answer-${i}`}
-                  role="region"
+                  aria-labelledby={`faq-question-${i}`}
                   className="overflow-hidden transition-all duration-300"
                   style={{
                     maxHeight: isOpen ? 200 : 0,
@@ -84,7 +82,7 @@ export default function FAQ() {
                     padding: isOpen ? "0 24px 20px" : "0 24px",
                   }}
                 >
-                  <p className="text-[14.5px] leading-[1.65] text-fg-muted">{item.a}</p>
+                  <p className="text-[14px] leading-[1.65] text-fg-muted">{item.a}</p>
                 </div>
               </div>
             );

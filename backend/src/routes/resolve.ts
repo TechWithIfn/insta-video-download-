@@ -5,7 +5,7 @@ import { checkRateLimit } from "../lib/rate-limit.js";
 import { generateToken } from "../lib/crypto.js";
 import { storeMedia } from "../lib/temp-store.js";
 import { logger } from "../lib/logger.js";
-import { AppError, createErrorResponse } from "../lib/errors.js";
+import { AppError, createError, createErrorResponse } from "../lib/errors.js";
 import type { ResolveResponse, ResolveErrorResponse } from "../lib/types.js";
 
 const router = Router();
@@ -91,7 +91,45 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       storyId: validation.parsed.storyId,
     });
 
-    const result = await resolveUrl(validation.parsed.normalized);
+    // Route-level timeout (mirrors the SSE stream guard): a hung provider
+    // fails fast with 504 while the in-flight work keeps running and warms
+    // the cache — so the same URL can be retried immediately and the retry
+    // is served from cache instead of hanging again. In-flight cleanup still
+    // runs via resolveUrl's finally; nothing is left stuck, and the response
+    // below is the single response for this request.
+    const timeoutMs = parseInt(process.env.RESOLVER_TIMEOUT_MS || "15000", 10);
+    const pending = resolveUrl(validation.parsed.normalized);
+    let gateWon = false;
+    const timeoutGate = new Promise<never>((_, reject) => {
+      const timer = setTimeout(() => {
+        gateWon = true;
+        reject(createError("RESOLVER_TIMEOUT"));
+      }, timeoutMs);
+      const cancel = () => clearTimeout(timer);
+      pending.then(cancel, cancel);
+    });
+    // Observe a late outcome for cache-warming visibility (and to avoid
+    // unhandled-rejection noise); quiet on the fast path.
+    pending.then(
+      (late) => {
+        if (gateWon) {
+          logger.info("Late resolve settled after route timeout (cache warmed)", {
+            requestId,
+            mediaCount: late.media.length,
+          });
+        }
+      },
+      (lateErr) => {
+        if (gateWon) {
+          logger.warn("Late resolve failed after route timeout", {
+            requestId,
+            error: lateErr instanceof Error ? lateErr.message : "unknown",
+          });
+        }
+      }
+    );
+
+    const result = await Promise.race([pending, timeoutGate]);
 
     const mediaId = generateToken();
     storeMedia(mediaId, result.media, result.type);

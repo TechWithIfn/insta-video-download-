@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useId } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, Film, Video, Image as ImageIcon, Clock, Music2 } from "lucide-react";
@@ -19,7 +19,7 @@ export const DROPDOWN_TOOLS: DropdownToolItem[] = [
     label: "Instagram Reels Downloader",
     icon: Film,
     iconBg: "rgba(236, 95, 168, 0.12)",
-    iconColor: "#ec5fa8",
+    iconColor: "var(--primary)",
   },
   {
     href: "/instagram-video-downloader",
@@ -33,21 +33,21 @@ export const DROPDOWN_TOOLS: DropdownToolItem[] = [
     label: "Instagram Photo Downloader",
     icon: ImageIcon,
     iconBg: "rgba(245, 142, 91, 0.14)",
-    iconColor: "#f58e5b",
+    iconColor: "var(--primary)",
   },
   {
     href: "/instagram-story-downloader",
     label: "Instagram Story Downloader",
     icon: Clock,
     iconBg: "rgba(14, 165, 233, 0.12)",
-    iconColor: "#0ea5e9",
+    iconColor: "var(--primary)",
   },
   {
     href: "/instagram-audio-downloader",
     label: "Instagram Audio Downloader",
     icon: Music2,
     iconBg: "rgba(16, 185, 129, 0.12)",
-    iconColor: "#10b981",
+    iconColor: "var(--primary)",
   },
 ];
 
@@ -57,7 +57,9 @@ export default function ToolCategoryDropdown() {
   const containerRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const menuId = useId();
+  // Stable plain ID (no useId): guaranteed resolvable by aria-controls and
+  // stable across SSR/hydration without framework-mangled characters.
+  const menuId = "downloadit-tool-menu";
 
   const isReelsActive = pathname === "/instagram-reels-downloader" || pathname === "/";
 
@@ -145,40 +147,31 @@ export default function ToolCategoryDropdown() {
 
   return (
     <div ref={containerRef} className="relative inline-flex items-center">
-      {/* Primary visible downloader: Instagram Reels Downloader with clearly clickable arrow */}
-      <div
-        className={`inline-flex items-center rounded-full transition-all duration-200 border ${
+      {/* Single tool-menu trigger: label + chevron in one control (the menu
+          lists Instagram Reels Downloader first, then the other tools). */}
+      <button
+        ref={toggleRef}
+        type="button"
+        onClick={toggle}
+        onKeyDown={onToggleKeyDown}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={menuId}
+        aria-label="Instagram downloaders menu"
+        className={`inline-flex items-center gap-1 rounded-full border py-1.5 pl-3 pr-2 text-[14px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
           isReelsActive || open
-            ? "bg-primary-light text-primary border-primary/25 shadow-xs"
+            ? "bg-primary-light text-primary-strong border-primary/25 shadow-xs"
             : "border-transparent text-fg-muted hover:bg-primary-light hover:text-primary"
         }`}
       >
-        <Link
-          href="/instagram-reels-downloader"
-          onClick={() => close()}
-          className="px-3 py-1.5 text-[14.5px] font-semibold transition-colors focus-visible:outline-none"
-        >
-          Instagram Reels Downloader
-        </Link>
-        <button
-          ref={toggleRef}
-          type="button"
-          onClick={toggle}
-          onKeyDown={onToggleKeyDown}
-          aria-haspopup="menu"
-          aria-expanded={open}
-          aria-controls={menuId}
-          aria-label="Toggle Instagram downloaders menu"
-          className="flex h-8 w-8 items-center justify-center rounded-full pr-1 text-fg-muted transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-        >
-          <ChevronDown
-            className="h-4 w-4 transition-transform duration-200"
-            style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
-            strokeWidth={2.2}
-            aria-hidden="true"
-          />
-        </button>
-      </div>
+        <span>Instagram Reels Downloader</span>
+        <ChevronDown
+          className="h-4 w-4 shrink-0 transition-transform duration-200"
+          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+          strokeWidth={2.2}
+          aria-hidden="true"
+        />
+      </button>
 
       {/* Clean premium glassmorphism dropdown directly below.
           Always mounted so open/close animates smoothly (opacity + transform
@@ -212,14 +205,14 @@ export default function ToolCategoryDropdown() {
                   role="menuitem"
                   tabIndex={open ? 0 : -1}
                   onClick={() => close()}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-medium transition-all duration-150 ${
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium transition-all duration-150 ${
                     isSelected
-                      ? "bg-primary-light text-primary font-semibold"
+                      ? "bg-primary-light text-primary-strong font-semibold"
                       : "text-fg hover:bg-primary-light hover:text-primary"
                   }`}
                 >
                   <span
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl"
                     style={{ background: tool.iconBg, color: tool.iconColor }}
                   >
                     <Icon size={15} strokeWidth={2.2} />

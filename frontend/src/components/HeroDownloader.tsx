@@ -24,6 +24,7 @@ import {
   Send,
   Bookmark,
   Volume2,
+  VolumeX,
 } from "lucide-react";
 import {
   resolveInstagramUrl,
@@ -179,7 +180,7 @@ function CircularProgress({ value, label }: { value: number; label: string }) {
   return (
     <div className="animate-fade-in-up mx-auto mt-6 w-full sm:mt-10" style={{ maxWidth: "380px" }}>
       <div
-        className="flex flex-col items-center rounded-[28px] px-6 py-8 text-center"
+        className="flex flex-col items-center rounded-[24px] px-6 py-8 text-center"
         style={{ background: "var(--card)", boxShadow: "0 20px 60px rgba(60,40,120,0.12)", border: "1px solid var(--border)" }}
         role="progressbar"
         aria-valuemin={0}
@@ -413,22 +414,22 @@ function VideoPlayer({ src, poster, mediaType, width, height, onDurationChange, 
             style={{ left: `${progress}%`, background: "var(--primary)" }}
           />
         </div>
-        <div className="mt-1.5 flex items-center justify-between text-[11px] font-medium tabular-nums text-white/60">
+        <div className="mt-1.5 flex items-center justify-between text-[12px] font-medium tabular-nums text-white/60">
           <span>{formatTime(currentTime)} / {formatTime(duration)}</span>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={toggleMute}
-              className="flex min-h-[32px] min-w-[44px] items-center justify-center rounded-lg px-2 text-[11px] font-semibold text-white/70 transition-colors hover:text-white"
+              className="flex h-8 w-8 items-center justify-center rounded-xl text-white/60 transition-colors hover:text-white"
               aria-label={muted ? "Unmute video" : "Mute video"}
               aria-pressed={muted}
             >
-              {muted ? "Unmute" : "Mute"}
+              {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             </button>
             <button
               type="button"
               onClick={toggleFullscreen}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/70 transition-colors hover:text-white"
+              className="flex h-8 w-8 items-center justify-center rounded-xl text-white/60 transition-colors hover:text-white"
               aria-label={fullscreen ? "Exit fullscreen" : "Enter fullscreen"}
               aria-pressed={fullscreen}
             >
@@ -563,7 +564,7 @@ function AudioPlayer({ src, onDurationChange }: { src: string; onDurationChange?
             style={{ left: `${progress}%`, background: "var(--primary)" }}
           />
         </div>
-        <div className="mt-1.5 flex items-center justify-between text-[11px] font-medium tabular-nums text-white/60">
+        <div className="mt-1.5 flex items-center justify-between text-[12px] font-medium tabular-nums text-white/60">
           <span>{formatTime(currentTime)}</span>
           <span>{formatTime(duration)}</span>
         </div>
@@ -939,13 +940,13 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
     return (
       <div className="result-card animate-fade-in-up mx-auto mt-6 w-[calc(100%-32px)] max-w-[900px] sm:mt-10 sm:w-full sm:px-5">
         <div
-          className="overflow-hidden rounded-[28px] p-4 sm:p-5 text-center"
+          className="overflow-hidden rounded-[24px] p-4 sm:p-5 text-center"
           style={{ background: "var(--card)", boxShadow: "0 20px 60px rgba(60,40,120,0.12)", border: "1px solid var(--border)" }}
         >
           <div className="flex flex-col items-center gap-3 py-6">
             <AlertCircle className="h-10 w-10 text-danger" />
-            <p className="text-[15px] font-semibold text-danger">The actual Story media could not be resolved.</p>
-            <p className="max-w-[420px] text-[13.5px] leading-[1.6] text-fg-muted">
+            <p className="text-[16px] font-semibold text-danger">The actual Story media could not be resolved.</p>
+            <p className="max-w-[420px] text-[14px] leading-[1.6] text-fg-muted">
               Instagram did not expose the requested Story media. The Story may have expired, been removed, or is not publicly accessible. Please try a different Story link or verify the Story is still viewable publicly.
             </p>
             <button
@@ -965,7 +966,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   return (
     <div className="result-card animate-fade-in-up mx-auto mt-6 w-[calc(100%-32px)] max-w-[900px] sm:mt-10 sm:w-full sm:px-5">
       <div
-        className="overflow-hidden rounded-[28px] p-3 sm:p-4 md:p-5"
+        className="overflow-hidden rounded-[24px] p-3 sm:p-4 md:p-5"
         style={{ background: "var(--card)", boxShadow: "0 20px 60px rgba(60,40,120,0.12)", border: "1px solid var(--border)" }}
       >
         {/* Card header: badge + handle + New */}
@@ -979,13 +980,13 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
           {result.author && (
             <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5 sm:justify-start">
               <div className="h-[22px] w-[22px] shrink-0 rounded-full" style={{ background: "var(--brand-gradient)" }} />
-              <span className="truncate text-[13px] font-semibold text-fg sm:text-[14px]">@{result.author.username}</span>
+              <span className="truncate text-[14px] font-semibold text-fg sm:text-[14px]">@{result.author.username}</span>
             </div>
           )}
           <button
             type="button"
             onClick={onReset}
-            className="flex min-h-[44px] shrink-0 items-center gap-1 px-1 text-[13px] font-semibold text-fg-subtle transition-colors hover:text-fg"
+            className="flex min-h-[44px] shrink-0 items-center gap-1 px-1 text-[14px] font-semibold text-fg-subtle transition-colors hover:text-fg"
           >
             <X className="h-3.5 w-3.5" />
             {t.result.newBtn}
@@ -997,14 +998,14 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
           const isLong = caption.length > 160;
           return (
             <div className="result-title px-1 pb-3">
-              <p className={`text-[13px] leading-[1.5] text-fg-muted break-words ${!captionExpanded && isLong ? "line-clamp-3" : ""}`}>
+              <p className={`text-[14px] leading-[1.5] text-fg-muted break-words ${!captionExpanded && isLong ? "line-clamp-3" : ""}`}>
                 {caption}
               </p>
               {isLong && (
                 <button
                   type="button"
                   onClick={() => setCaptionExpanded((v) => !v)}
-                  className="mt-1 min-h-[32px] text-[12.5px] font-semibold text-primary transition-colors hover:text-primary-hover"
+                  className="mt-1 min-h-[32px] text-[12px] font-semibold text-primary transition-colors hover:text-primary-hover"
                   aria-expanded={captionExpanded}
                 >
                   {captionExpanded ? "Show less" : "Show more"}
@@ -1026,11 +1027,11 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
                     className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-3 rounded-[20px] md:aspect-[4/3]"
                     style={{ background: "linear-gradient(145deg, #1a1028 0%, #0f0c1b 100%)" }}
                   >
-                    <svg className="h-8 w-8 animate-spin text-white/40" viewBox="0 0 24 24" fill="none">
+                    <svg className="h-8 w-8 animate-spin text-white/60" viewBox="0 0 24 24" fill="none">
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
                       <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" className="opacity-75" />
                     </svg>
-                    <p className="text-xs text-white/50">{t.result.extractingAudio}</p>
+                    <p className="text-xs text-white/60">{t.result.extractingAudio}</p>
                   </div>
                 )}
                 {audioError && (
@@ -1076,7 +1077,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
               >
                 {!imgLoaded && !imgFailed && (
                   <div aria-hidden="true" className="absolute inset-0 flex min-h-[180px] items-center justify-center">
-                    <svg className="h-8 w-8 animate-spin text-white/40" viewBox="0 0 24 24" fill="none">
+                    <svg className="h-8 w-8 animate-spin text-white/60" viewBox="0 0 24 24" fill="none">
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
                       <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" className="opacity-75" />
                     </svg>
@@ -1103,7 +1104,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
                     onClick={goPrev}
                     disabled={safeIndex === 0}
                     aria-label="Previous image"
-                    className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-white backdrop-blur-md transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
+                    className="absolute left-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-white backdrop-blur-md transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
                     style={{ background: "rgba(10,10,20,0.55)", border: "1px solid rgba(255,255,255,0.25)" }}
                   >
                     <ChevronLeft className="h-5 w-5" />
@@ -1113,7 +1114,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
                     onClick={goNext}
                     disabled={safeIndex === items.length - 1}
                     aria-label="Next image"
-                    className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-white backdrop-blur-md transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
+                    className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-white backdrop-blur-md transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
                     style={{ background: "rgba(10,10,20,0.55)", border: "1px solid rgba(255,255,255,0.25)" }}
                   >
                     <ChevronRight className="h-5 w-5" />
@@ -1134,7 +1135,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
               <button
                 type="button"
                 onClick={handlePreview}
-                className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-[14px] border border-border bg-card px-4 text-[14px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary"
+                className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 text-[14px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary"
               >
                 <Play className="h-4 w-4" />
                 Preview
@@ -1169,28 +1170,28 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
               </button>
             </div>
             {downloading === "error" && !isAudio && (
-              <p className="text-center text-[12.5px] font-medium text-danger" role="alert">
+              <p className="text-center text-[12px] font-medium text-danger" role="alert">
                 {t.result.downloadFailed}
               </p>
             )}
-            <dl className="grid grid-cols-2 gap-2 text-[12.5px]">
+            <dl className="grid grid-cols-2 gap-2 text-[12px]">
               {!isAudio && (
-                <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                <div className="rounded-xl px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
                   <dt className="font-medium text-fg-subtle">Resolution</dt>
                   <dd className="mt-0.5 font-semibold tabular-nums text-fg">{formatResolution(effW, effH)}</dd>
                 </div>
               )}
-              <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+              <div className="rounded-xl px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
                 <dt className="font-medium text-fg-subtle">File Size</dt>
                 <dd className="mt-0.5 font-semibold tabular-nums text-fg">{isAudio ? (audioSize !== null ? formatBytes(audioSize) : "MP3 · 192k") : formatBytes(currentMedia?.size)}</dd>
               </div>
               {(isAudio || currentMedia?.type === "video") && (
-                <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                <div className="rounded-xl px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
                   <dt className="font-medium text-fg-subtle">Duration</dt>
                   <dd className="mt-0.5 font-semibold tabular-nums text-fg">{isAudio ? (audioDuration !== null && audioDuration > 0 ? formatTime(audioDuration) : "Audio · MP3") : formatMetaDuration(currentMedia?.duration, realDuration)}</dd>
                 </div>
               )}
-              <div className="rounded-[12px] px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+              <div className="rounded-xl px-3 py-2" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
                 <dt className="font-medium text-fg-subtle">Format</dt>
                 <dd className="mt-0.5 font-semibold text-fg">{isAudio ? "MP3" : (currentMedia ? labelForMedia(currentMedia) : "Unknown")}</dd>
               </div>
@@ -1200,7 +1201,7 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
 
       </div>
 
-      <p className="mt-4 break-words px-2 text-center text-[12px] text-fg-subtle sm:text-[12.5px]">{t.result.tempNote}</p>
+      <p className="mt-4 break-words px-2 text-center text-[12px] text-fg-subtle sm:text-[12px]">{t.result.tempNote}</p>
     </div>
   );
 }
@@ -1430,7 +1431,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
           {/* Left Content Column */}
           <div className="lg:col-span-7 min-w-0 flex flex-col text-left">
             <div
-              className="animate-fade-in-up mb-4 inline-flex max-w-full items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-semibold tracking-wide text-fg-muted sm:mb-5 sm:gap-2 sm:px-4 sm:text-xs self-start"
+              className="animate-fade-in-up mb-4 inline-flex max-w-full items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold tracking-wide text-fg-muted sm:mb-5 sm:gap-2 sm:px-4 sm:text-xs self-start"
               style={{ background: "var(--card)", boxShadow: "var(--shadow-card)", border: "1px solid var(--border)" }}
             >
               <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-accent" />
@@ -1459,7 +1460,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
               </span>
             </h1>
 
-            <p className="hero-subtitle animate-fade-in-up delay-200 mt-4 text-[15px] sm:text-[16px] leading-[1.65] text-fg-muted max-w-xl">
+            <p className="hero-subtitle animate-fade-in-up delay-200 mt-4 text-[16px] sm:text-[16px] leading-[1.65] text-fg-muted max-w-xl">
               Download public Instagram Reels, videos, photos, stories and audio with Downloadit. Preview media and save it to your device quickly — no login required.
             </p>
 
@@ -1480,24 +1481,24 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                       role="tab"
                       aria-selected={active}
                       onClick={() => onActiveTabChange(cat.id)}
-                      className={`group flex flex-col items-start p-2.5 xl:p-3 rounded-xl transition-all duration-200 text-left cursor-pointer border ${
+                      className={`group flex flex-col items-start p-2.5 xl:p-3 rounded-xl transition-all duration-200 text-left cursor-pointer border-2 ${
                         active
-                          ? "bg-primary-light border-primary/40 shadow-xs"
-                          : "bg-card border-border hover:border-primary/30 hover:bg-primary-light/40"
+                          ? "bg-primary-light border-primary/50 shadow-xs ring-2 ring-primary/15"
+                          : "bg-card border-transparent hover:border-primary/30 hover:bg-primary-light/40"
                       }`}
                     >
                       <div className="flex items-center justify-between w-full mb-1.5">
-                        <span className={`text-[12.5px] font-bold transition-colors ${active ? "text-primary" : "text-fg group-hover:text-primary"}`}>
+                        <span className={`text-[12px] font-bold transition-colors ${active ? "text-primary-strong" : "text-fg group-hover:text-primary"}`}>
                           {cat.title}
                         </span>
                         <span
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md"
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
                           style={{ background: cat.iconBg, color: cat.iconColor }}
                         >
                           <Icon size={12} strokeWidth={2.2} />
                         </span>
                       </div>
-                      <span className="text-[10.5px] leading-tight text-fg-subtle truncate max-w-full">
+                      <span className="text-[10px] leading-tight text-fg-subtle truncate max-w-full">
                         {cat.subtitle}
                       </span>
                     </button>
@@ -1529,33 +1530,30 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                           if (error) setError("");
                         }}
                         placeholder="Paste Instagram link here..."
-                        className="h-13 w-full rounded-xl border-0 bg-transparent pl-12 pr-4 text-[16px] text-fg placeholder:text-fg-subtle focus:outline-none"
+                        className="h-13 w-full rounded-xl border-0 bg-transparent pl-12 pr-12 text-[16px] text-fg placeholder:text-fg-subtle focus:outline-none"
                         style={{ fontFamily: "var(--font-sans)", fontWeight: 500 }}
                         aria-label={t.hero.inputLabel}
                         autoComplete="off"
                         spellCheck={false}
                         disabled={state === "PREPARING"}
                       />
+                      {url && state !== "PREPARING" && (
+                        <button
+                          type="button"
+                          onClick={handleClear}
+                          className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-fg-subtle transition-colors hover:bg-primary-light hover:text-primary"
+                          aria-label={t.common.clear}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
-
-                    {url && state !== "PREPARING" && (
-                      <button
-                        type="button"
-                        onClick={handleClear}
-                        className="flex h-13 shrink-0 items-center gap-1 rounded-xl border border-border px-3 text-xs font-medium text-fg-muted transition-colors hover:bg-primary-light hover:text-primary"
-                        style={{ background: "var(--bg)" }}
-                        aria-label={t.common.clear}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        {t.common.clear}
-                      </button>
-                    )}
 
                     <button
                       type="button"
                       onClick={handlePaste}
                       disabled={state === "PREPARING"}
-                      className="flex h-13 shrink-0 items-center gap-1.5 rounded-xl border border-border px-3.5 text-xs font-medium text-fg-muted transition-colors hover:bg-primary-light hover:text-primary disabled:opacity-50"
+                      className="flex h-13 shrink-0 items-center gap-1.5 rounded-xl border border-border px-3.5 text-xs font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary disabled:opacity-50"
                       style={{ background: "var(--bg)" }}
                       aria-label={t.common.paste}
                     >
@@ -1566,7 +1564,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                     <button
                       type="submit"
                       disabled={state === "PREPARING"}
-                      className="gradient-btn h-13 shrink-0 px-7 text-[15px]"
+                      className="gradient-btn h-13 shrink-0 px-7 text-[16px]"
                     >
                       {state === "PREPARING" ? (
                         <>
@@ -1621,7 +1619,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                         type="button"
                         onClick={handlePaste}
                         disabled={state === "PREPARING"}
-                        className="flex h-12 min-h-[48px] w-full min-w-0 items-center justify-center gap-1.5 rounded-xl border border-border px-3 text-[14px] font-medium text-fg-muted transition-colors hover:bg-primary-light hover:text-primary disabled:opacity-50"
+                        className="flex h-12 min-h-[48px] w-full min-w-0 items-center justify-center gap-1.5 rounded-xl border border-border px-3 text-[14px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary disabled:opacity-50"
                         style={{ background: "var(--bg)" }}
                         aria-label={t.common.paste}
                       >
@@ -1631,7 +1629,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                       <button
                         type="submit"
                         disabled={state === "PREPARING"}
-                        className="gradient-btn h-12 min-h-[48px] w-full min-w-0 px-3 text-[15px]"
+                        className="gradient-btn h-12 min-h-[48px] w-full min-w-0 px-3 text-[16px]"
                       >
                         {state === "PREPARING" ? (
                           <>
@@ -1654,7 +1652,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
               </form>
 
               {/* Trust Badges */}
-              <div className="mt-3 flex flex-wrap items-center justify-start gap-x-4 gap-y-1.5 px-1 text-[12.5px] text-fg-subtle sm:mt-4 sm:gap-x-5 sm:text-[13.5px]">
+              <div className="mt-3 flex flex-wrap items-center justify-start gap-x-4 gap-y-1.5 px-1 text-[12px] text-fg-subtle sm:mt-4 sm:gap-x-5 sm:text-[14px]">
                 <span className="flex items-center gap-1.5">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-success" />
                   {t.hero.foot1}
@@ -1676,7 +1674,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
             <div className="relative w-full max-w-[320px] xl:max-w-[340px] flex items-center justify-center">
               {/* Phone Mockup Frame */}
               <div
-                className="relative w-[275px] xl:w-[290px] h-[510px] xl:h-[530px] rounded-[42px] p-2 shadow-2xl select-none"
+                className="relative w-[275px] xl:w-[290px] h-[510px] xl:h-[530px] rounded-[28px] p-2 shadow-2xl select-none"
                 style={{
                   background: "#0b0c16",
                   border: "8px solid #1c1d2e",
@@ -1687,13 +1685,13 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                 <div className="mx-auto h-4 w-20 rounded-full bg-black mb-2" />
 
                 {/* Mock Phone Screen */}
-                <div className="h-[calc(100%-24px)] rounded-[32px] bg-slate-900 overflow-hidden flex flex-col justify-between text-white p-3 border border-white/5">
+                <div className="h-[calc(100%-24px)] rounded-[24px] bg-slate-900 overflow-hidden flex flex-col justify-between text-white p-3 border border-white/5">
                   {/* Mock IG Header */}
                   <div className="flex items-center justify-between pb-2 border-b border-white/10">
                     <span className="text-[14px] font-bold italic tracking-wide" style={{ background: "var(--brand-gradient-text)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                       Instagram
                     </span>
-                    <div className="flex items-center gap-2 text-white/70">
+                    <div className="flex items-center gap-2 text-white/60">
                       <Heart size={14} />
                       <Send size={14} />
                     </div>
@@ -1703,13 +1701,13 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                   <div className="flex items-center justify-between py-1.5">
                     <div className="flex items-center gap-2">
                       <div className="h-6 w-6 rounded-full p-[1.5px]" style={{ background: "var(--brand-gradient)" }}>
-                        <div className="h-full w-full rounded-full bg-slate-950 flex items-center justify-center text-[10px] font-bold text-pink-400">
+                        <div className="h-full w-full rounded-full bg-slate-950 flex items-center justify-center text-[10px] font-bold text-accent">
                           D
                         </div>
                       </div>
-                      <span className="text-[12px] font-semibold text-white/90">downloadit.pro</span>
+                      <span className="text-[12px] font-semibold text-white">downloadit.pro</span>
                     </div>
-                    <span className="text-white/40 text-[11px]">•••</span>
+                    <span className="text-white/60 text-[12px]">•••</span>
                   </div>
 
                   {/* Mock Video / Reel Area */}
@@ -1727,7 +1725,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                       <Play size={20} className="ml-1 text-white fill-white" />
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px] text-white/80">
+                    <div className="flex items-center justify-between text-[12px] text-white">
                       <span className="truncate flex items-center gap-1">
                         <Music size={11} /> Original Audio · Viral Hits
                       </span>
@@ -1737,12 +1735,12 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
 
                   {/* Mock Post Actions */}
                   <div className="flex items-center justify-between pt-2">
-                    <div className="flex items-center gap-3 text-white/80 text-[11px]">
-                      <span className="flex items-center gap-1"><Heart size={14} className="text-pink-500 fill-pink-500" /> 84.2k</span>
+                    <div className="flex items-center gap-3 text-white text-[12px]">
+                      <span className="flex items-center gap-1"><Heart size={14} className="text-accent fill-accent" /> 84.2k</span>
                       <span className="flex items-center gap-1"><MessageCircle size={14} /> 1.4k</span>
                       <Send size={14} />
                     </div>
-                    <Bookmark size={14} className="text-white/80" />
+                    <Bookmark size={14} className="text-white" />
                   </div>
                 </div>
               </div>
@@ -1761,10 +1759,10 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[13px] font-bold text-fg">Reels</span>
-                    <span className="rounded-md px-1.5 py-0.2 text-[9.5px] font-bold text-pink-600 bg-pink-500/10">1080p</span>
+                    <span className="text-[14px] font-bold text-fg">Reels</span>
+                    <span className="rounded-full px-1.5 py-0.2 text-[10px] font-bold text-fg-muted bg-pink-500/10">1080p</span>
                   </div>
-                  <span className="block text-[11px] font-medium text-fg-subtle">Download Reels</span>
+                  <span className="block text-[12px] font-medium text-fg-subtle">Download Reels</span>
                 </div>
               </div>
 
@@ -1782,10 +1780,10 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[13px] font-bold text-fg">Stories</span>
-                    <span className="rounded-md px-1.5 py-0.2 text-[9.5px] font-bold text-sky-600 bg-sky-500/10">24h</span>
+                    <span className="text-[14px] font-bold text-fg">Stories</span>
+                    <span className="rounded-full px-1.5 py-0.2 text-[10px] font-bold text-fg-muted bg-sky-500/10">24h</span>
                   </div>
-                  <span className="block text-[11px] font-medium text-fg-subtle">Save Stories</span>
+                  <span className="block text-[12px] font-medium text-fg-subtle">Save Stories</span>
                 </div>
               </div>
 
@@ -1803,10 +1801,10 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[13px] font-bold text-fg">Audio</span>
-                    <span className="rounded-md px-1.5 py-0.2 text-[9.5px] font-bold text-emerald-600 bg-emerald-500/10">MP3</span>
+                    <span className="text-[14px] font-bold text-fg">Audio</span>
+                    <span className="rounded-full px-1.5 py-0.2 text-[10px] font-bold text-fg-muted bg-emerald-500/10">MP3</span>
                   </div>
-                  <span className="block text-[11px] font-medium text-fg-subtle">Extract Audio</span>
+                  <span className="block text-[12px] font-medium text-fg-subtle">Extract Audio</span>
                 </div>
               </div>
 
@@ -1824,10 +1822,10 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[13px] font-bold text-fg">Photos</span>
-                    <span className="rounded-md px-1.5 py-0.2 text-[9.5px] font-bold text-amber-600 bg-amber-500/10">Original</span>
+                    <span className="text-[14px] font-bold text-fg">Photos</span>
+                    <span className="rounded-full px-1.5 py-0.2 text-[10px] font-bold text-fg-muted bg-amber-500/10">Original</span>
                   </div>
-                  <span className="block text-[11px] font-medium text-fg-subtle">Get Photos</span>
+                  <span className="block text-[12px] font-medium text-fg-subtle">Get Photos</span>
                 </div>
               </div>
             </div>

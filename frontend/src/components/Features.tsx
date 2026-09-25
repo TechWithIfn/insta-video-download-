@@ -30,16 +30,13 @@ export default function Features() {
     >
       <div className="mx-auto max-w-[1200px]">
         <div className="mb-14 text-center">
-          <p
-            className="mb-3 text-[13px] font-bold uppercase tracking-[0.12em]"
-            style={{ background: "var(--brand-gradient-text)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}
-          >
+          <p className="mb-3 text-[14px] font-bold uppercase tracking-[0.12em] text-primary-strong">
             {t.features.eyebrow}
           </p>
-          <h2 className="text-3xl font-bold tracking-[-0.02em] text-fg sm:text-[40px]">
+          <h2 className="text-[28px] font-bold tracking-[-0.02em] text-fg sm:text-[40px]">
             {t.features.title}
           </h2>
-          <p className="mx-auto mt-4 max-w-[480px] text-[17px] leading-relaxed text-fg-muted">
+          <p className="mx-auto mt-4 max-w-[480px] text-[18px] leading-relaxed text-fg-muted">
             {t.features.subtitle}
           </p>
         </div>
@@ -62,7 +59,7 @@ export default function Features() {
                   <Icon size={20} color={s.iconColor} strokeWidth={2} />
                 </div>
                 <h3 className="text-[18px] font-bold text-fg">{card.title}</h3>
-                <p className="mt-2 text-[14.5px] leading-[1.6] text-fg-muted">{card.desc}</p>
+                <p className="mt-2 text-[14px] leading-[1.6] text-fg-muted">{card.desc}</p>
               </div>
             );
           })}
