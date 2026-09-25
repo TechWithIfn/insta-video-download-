@@ -34,7 +34,7 @@ export default function VideoDownloaderPage() {
             Download public Instagram videos as MP4 with Downloadit. Whether it’s a standard feed video, IGTV-style clip, or long-form post, paste the video link, preview the file and save it to your device — no login required.
           </p>
           <p className="mt-3 text-[15px] leading-[1.7] text-fg-muted">
-            This video downloader extracts the original MP4 served by Instagram. You get the same file for offline viewing on your phone, without installing an app or creating an account. It’s the fastest way to save Instagram videos online.
+            This video downloader extracts the original MP4 served by Instagram. You get the same file for offline viewing on your phone, without installing an app or creating an account. It’s a fast way to save Instagram videos online — the same simple flow works if you searched for an insta video download or an insta video saver for your phone.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/#hero" className="inline-flex min-h-[48px] items-center justify-center rounded-2xl px-6 text-[15px] font-bold text-white shadow-[var(--shadow-brand)]" style={{ background: "var(--brand-gradient)" }}>
@@ -104,6 +104,10 @@ export default function VideoDownloaderPage() {
               <details className="group rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
                 <summary className="cursor-pointer text-[15px] font-semibold text-fg">Why did the MP4 link expire?</summary>
                 <p className="mt-2 text-[14px] leading-[1.6] text-fg-muted">Instagram signs media URLs temporarily. Resolve the original post link again for a fresh download URL.</p>
+              </details>
+              <details className="group rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                <summary className="cursor-pointer text-[15px] font-semibold text-fg">How do I download Instagram videos to my phone?</summary>
+                <p className="mt-2 text-[14px] leading-[1.6] text-fg-muted">Open the video, copy its link, and paste it into Downloadit. After the preview loads, tap Download to save the MP4 directly to your phone — no app install needed.</p>
               </details>
             </div>
           </section>

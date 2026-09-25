@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Download, Mail } from "lucide-react";
 import Link from "next/link";
 import { SUPPORT_EMAIL, SUPPORT_GMAIL_URL } from "@/config/site";
@@ -35,7 +36,17 @@ function LinkColumn({ title, links }: { title: string; links: { label: string; h
 
 export default function Footer() {
   const { t } = useLanguage();
-  const year = new Date().getFullYear();
+  // Resolved after mount so the statically prerendered HTML (baked at build
+  // time) and the first client render are byte-identical — computing the
+  // year during render would hydrate-mismatch whenever build year and view
+  // year differ.
+  const [year, setYear] = useState<number | null>(null);
+  useEffect(() => {
+    // Deferred (repo convention) to avoid a synchronous setState in effect.
+    queueMicrotask(() => {
+      setYear(new Date().getFullYear());
+    });
+  }, []);
 
   const PRODUCT_LINKS = [
     { label: "Instagram Reels Downloader", href: "/instagram-reels-downloader" },
@@ -106,7 +117,7 @@ export default function Footer() {
         </p>
 
         <div className="mt-4 flex flex-col gap-2 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[13px] text-fg-muted">&copy; {year} Downloadit. {t.footer.rights}</p>
+          <p className="text-[13px] text-fg-muted">&copy;{year !== null ? ` ${year}` : ""} Downloadit. {t.footer.rights}</p>
           <p className="text-[13px] text-fg-subtle">{t.footer.madeWith}</p>
         </div>
       </div>

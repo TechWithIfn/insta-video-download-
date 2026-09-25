@@ -98,7 +98,7 @@ export default function Home() {
                 <div>
                   <h3 className="text-[16px] font-bold text-fg">Supported formats and devices</h3>
                   <p className="mt-2 text-[14.5px] leading-[1.7] text-fg-muted">
-                    Reels and videos → MP4 (Instagram MP4 download), photos → JPG/PNG/WebP (Instagram image download), audio → MP3 (Instagram MP3 download). Works on mobile, tablet and desktop. Save Instagram reels to phone or download Instagram photos to phone directly in your browser — free, fast, and online.
+                    Reels and videos → MP4 (Instagram MP4 download), photos → JPG/PNG/WebP (Instagram image download), audio → MP3 (Instagram MP3 download). Works on mobile, tablet and desktop. Save Instagram reels to phone or download Instagram photos to phone directly in your browser — free, fast, and online. If you searched for an insta downloader, insta video download, or insta reels download tool, this single page covers all of them: paste any public link and save it to your device.
                   </p>
                 </div>
                 <div>

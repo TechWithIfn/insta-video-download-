@@ -313,6 +313,24 @@ button:focus-visible {
   to { opacity: 1; }
 }
 
+/* Media mount/swap fade: opacity only (never layout), 180ms so slide
+   switches feel instant without a blink. Applied to player roots that
+   intentionally remount per source. */
+@keyframes media-mount {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.media-mount {
+  animation: media-mount 0.18s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-mount {
+    animation: none;
+  }
+}
+
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
@@ -376,6 +394,7 @@ button:focus-visible {
 
 .delay-100 { animation-delay: 100ms; }
 .delay-200 { animation-delay: 200ms; }
+.delay-250 { animation-delay: 250ms; }
 .delay-300 { animation-delay: 300ms; }
 .delay-400 { animation-delay: 400ms; }
 .delay-500 { animation-delay: 500ms; }

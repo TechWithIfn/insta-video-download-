@@ -66,7 +66,7 @@ export default function StoryDownloaderPage() {
 
           <h2 className="mt-12 text-[22px] font-bold text-fg">Save Instagram stories without login</h2>
           <p className="mt-3 text-[15px] leading-[1.7] text-fg-muted">
-            Many users search for Instagram story downloader online and Instagram story saver to keep public stories before they vanish. Downloadit is an Instagram story download tool that works as a story saver for phone and desktop — paste a public story link and save the media for offline viewing.
+            Many users search for Instagram story downloader online and Instagram story saver to keep public stories before they vanish. Downloadit is an Instagram story download tool that works as a story saver for phone and desktop — paste a public story link and save the media for offline viewing. If you searched for insta story download, paste the link here before the 24-hour expiry to save the story to your phone.
           </p>
 
           <h2 className="mt-10 text-[18px] font-bold text-fg">Limitations for private and expired content</h2>
@@ -104,6 +104,10 @@ export default function StoryDownloaderPage() {
               <details className="group rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
                 <summary className="cursor-pointer text-[15px] font-semibold text-fg">Do I need to log in?</summary>
                 <p className="mt-2 text-[14px] leading-[1.6] text-fg-muted">No. Downloadit is an Instagram downloader no login story saver for public links.</p>
+              </details>
+              <details className="group rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                <summary className="cursor-pointer text-[15px] font-semibold text-fg">How do I save a story before it expires?</summary>
+                <p className="mt-2 text-[14px] leading-[1.6] text-fg-muted">Copy the story link while it is still live, paste it into Downloadit, and download the image or video right away. Once Instagram removes it after 24 hours, the link cannot be resolved.</p>
               </details>
             </div>
           </section>

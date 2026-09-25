@@ -36,8 +36,14 @@ export default function Header({ activeDownloaderTab }: HeaderProps) {
 
   const current = LANGUAGES.find((l) => l.code === lang) ?? LANGUAGES[0];
   const onHelp = pathname === "/help";
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Initialize theme and mounted flag
+  // Initialize theme and mounted flag.
+  // Deferred via queueMicrotask so the setState is not synchronous in the
+  // effect body (lint-clean, no cascading render). Pre-paint color stability
+  // on refresh is already guaranteed by the blocking theme script in
+  // layout.tsx; the toggle itself has a fixed width so its icon settling one
+  // tick later causes zero layout shift.
   useEffect(() => {
     // Use queueMicrotask to defer the setState to avoid synchronous effect warning
     queueMicrotask(() => {
@@ -231,11 +237,13 @@ export default function Header({ activeDownloaderTab }: HeaderProps) {
             </button>
 
             <button
+              ref={menuButtonRef}
               type="button"
               className="site-menu-btn flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-fg-muted transition-colors hover:bg-primary-light hover:text-primary lg:hidden"
               onClick={() => setMobileOpen(true)}
               aria-label={t.header.openMenu}
               aria-expanded={mobileOpen}
+              aria-controls="downloadit-mobile-menu"
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -248,15 +256,17 @@ export default function Header({ activeDownloaderTab }: HeaderProps) {
       )}
 
       <div
+        id="downloadit-mobile-menu"
         className={`mobile-drawer fixed inset-y-0 right-0 z-50 flex h-full w-[min(82vw,380px)] flex-col overflow-hidden rounded-l-[28px] bg-bg-elevated shadow-[var(--shadow-xl)] transition-transform duration-300 ease-out lg:hidden ${mobileOpen ? "translate-x-0 pointer-events-auto" : "translate-x-full pointer-events-none"}`}
         role="dialog" aria-modal="true" aria-hidden={!mobileOpen} aria-label={t.common.mobileNav}
+        inert={!mobileOpen}
       >
         <div className="mobile-drawer-header flex h-[68px] shrink-0 items-center justify-between border-b border-border px-5">
           <div>
             <span className="block text-[16px] font-bold text-fg">Downloadit</span>
             <span className="block text-[11px] font-medium text-fg-subtle">{t.common.mobileNav}</span>
           </div>
-          <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl text-fg-muted transition-colors hover:bg-primary-light hover:text-primary" onClick={closeMobileMenu} aria-label={t.header.closeMenu}>
+          <button type="button" autoFocus={mobileOpen} className="flex h-10 w-10 items-center justify-center rounded-xl text-fg-muted transition-colors hover:bg-primary-light hover:text-primary" onClick={() => { closeMobileMenu(); menuButtonRef.current?.focus(); }} aria-label={t.header.closeMenu}>
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -291,14 +301,52 @@ export default function Header({ activeDownloaderTab }: HeaderProps) {
             <span className="mobile-nav-icon bg-violet-500/10 text-violet-500"><Lightbulb className="h-[18px] w-[18px]" /></span>
             <span>How It Works</span>
           </Link>
-          <Link href="/help" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
-            <span className="mobile-nav-icon bg-sky-500/10 text-sky-500"><CircleHelp className="h-[18px] w-[18px]" /></span>
-            <span>Help</span>
+          <Link href="/#faq" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
+            <span className="mobile-nav-icon bg-indigo-500/10 text-indigo-500"><CircleHelp className="h-[18px] w-[18px]" /></span>
+            <span>FAQ</span>
           </Link>
           <a href={SUPPORT_GMAIL_URL} target="_blank" rel="noopener noreferrer" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
             <span className="mobile-nav-icon bg-rose-500/10 text-rose-500"><Mail className="h-[18px] w-[18px]" /></span>
-            <span>{t.common.emailSupport}</span>
+            <span>Contact</span>
           </a>
+          <Link href="/help" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
+            <span className="mobile-nav-icon bg-sky-500/10 text-sky-500"><HelpCircle className="h-[18px] w-[18px]" /></span>
+            <span>Help</span>
+          </Link>
+          <div className="my-2 border-t border-border-light" />
+          <p className="flex items-center gap-2 px-3 pb-1 pt-1 text-[12px] font-bold uppercase tracking-[0.1em] text-fg-subtle">
+            <Globe className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+            {t.common.language}
+          </p>
+          <div className="flex flex-wrap gap-1.5 px-3 pb-1" role="group" aria-label={t.common.language}>
+            {LANGUAGES.map((l) => {
+              const active = l.code === lang;
+              return (
+                <button
+                  key={l.code}
+                  type="button"
+                  onClick={() => setLang(l.code)}
+                  aria-pressed={active}
+                  className={`flex min-h-[40px] items-center rounded-xl px-3 text-[13.5px] font-semibold transition-colors ${active ? "bg-primary-light text-primary" : "text-fg-muted hover:bg-primary-light hover:text-primary"}`}
+                >
+                  {active ? <Check className="mr-1.5 h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" /> : null}
+                  {l.short}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-pressed={isDark}
+            aria-label={isDark ? t.header.themeToLight : t.header.themeToDark}
+            className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-[15px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary"
+          >
+            <span className="mobile-nav-icon bg-amber-500/10 text-amber-500">
+              {isDark ? <Moon className="h-[18px] w-[18px]" /> : <Sun className="h-[18px] w-[18px]" />}
+            </span>
+            <span className="flex-1">{isDark ? t.header.themeToLight : t.header.themeToDark}</span>
+          </button>
           <Link href="/privacy" onClick={handleNavClick} className="flex min-h-[44px] items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-semibold text-fg transition-colors hover:bg-primary-light hover:text-primary">
             <span className="mobile-nav-icon bg-teal-500/10 text-teal-500"><Shield className="h-[18px] w-[18px]" /></span>
             <span>Privacy</span>

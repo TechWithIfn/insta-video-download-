@@ -66,7 +66,7 @@ export default function PhotoDownloaderPage() {
 
           <h2 className="mt-12 text-[22px] font-bold text-fg">Save Instagram photos without login</h2>
           <p className="mt-3 text-[15px] leading-[1.7] text-fg-muted">
-            People search for Instagram photo downloader online and Instagram image saver to keep high-resolution photos for offline viewing. Downloadit lets you download Instagram photos to phone directly in the browser — paste a public photo link and save the original image without creating an Instagram account.
+            People search for Instagram photo downloader online and Instagram image saver to keep high-resolution photos for offline viewing. Downloadit lets you download Instagram photos to phone directly in the browser — paste a public photo link and save the original image without creating an Instagram account. The same page answers insta photo download and insta image download searches for both single photos and multi-photo posts.
           </p>
 
           <h2 className="mt-10 text-[18px] font-bold text-fg">Limitations for private content</h2>
@@ -104,6 +104,10 @@ export default function PhotoDownloaderPage() {
               <details className="group rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
                 <summary className="cursor-pointer text-[15px] font-semibold text-fg">Do I need to log in?</summary>
                 <p className="mt-2 text-[14px] leading-[1.6] text-fg-muted">No. Downloadit is an Instagram downloader no login image saver for public links.</p>
+              </details>
+              <details className="group rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                <summary className="cursor-pointer text-[15px] font-semibold text-fg">How do I save Instagram photos to my phone?</summary>
+                <p className="mt-2 text-[14px] leading-[1.6] text-fg-muted">Copy the photo post link, paste it into Downloadit, and download each image in original quality. On mobile the JPG saves straight to your device from the browser.</p>
               </details>
             </div>
           </section>

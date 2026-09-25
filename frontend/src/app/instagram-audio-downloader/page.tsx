@@ -66,7 +66,7 @@ export default function AudioDownloaderPage() {
 
           <h2 className="mt-12 text-[22px] font-bold text-fg">Save Instagram audio without login</h2>
           <p className="mt-3 text-[15px] leading-[1.7] text-fg-muted">
-            Users search for Instagram MP3 downloader and Instagram music downloader online to keep a reel’s sound. Downloadit lets you download Instagram audio to phone without logging in — paste a public video link in Audio mode and save the MP3 for offline listening.
+            Users search for Instagram MP3 downloader and Instagram music downloader online to keep a reel’s sound. Downloadit lets you download Instagram audio to phone without logging in — paste a public video link in Audio mode and save the MP3 for offline listening. Whether you call it insta audio download, insta music download, or reel audio to MP3, Audio mode handles it the same way.
           </p>
 
           <h2 className="mt-10 text-[18px] font-bold text-fg">Privacy and limitations</h2>
@@ -104,6 +104,10 @@ export default function AudioDownloaderPage() {
               <details className="group rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
                 <summary className="cursor-pointer text-[15px] font-semibold text-fg">Why is audio extraction temporarily unavailable?</summary>
                 <p className="mt-2 text-[14px] leading-[1.6] text-fg-muted">Audio needs backend processing; if the provider is busy, try again shortly or try the video downloader for the MP4.</p>
+              </details>
+              <details className="group rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                <summary className="cursor-pointer text-[15px] font-semibold text-fg">How do I get MP3 audio from a Reel?</summary>
+                <p className="mt-2 text-[14px] leading-[1.6] text-fg-muted">Copy the public Reel link, open Downloadit in Audio mode, and paste it. Downloadit extracts the reel sound and returns an MP3 you can preview and save to your phone.</p>
               </details>
             </div>
           </section>

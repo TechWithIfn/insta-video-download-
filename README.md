@@ -9,7 +9,7 @@ A production-quality Instagram media downloader web application with a clean fro
 | Reels | Supported | Video preview, author, duration |
 | Video Posts | Supported | Video preview, author |
 | Image Posts | Supported | Image preview, dimensions |
-| Carousel Posts | Supported | Multi-item navigation, grid view |
+| Carousel Posts | Supported via Photo Downloader | Multi-item navigation (no dedicated carousel route) |
 | Stories | Supported | Image/video preview, 9:16 aspect ratio |
 | Highlights | Supported | Multi-story navigation, mixed media |
 

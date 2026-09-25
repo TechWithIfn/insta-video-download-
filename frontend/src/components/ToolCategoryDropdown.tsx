@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useId } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, Video, Image as ImageIcon, Clock, Music2 } from "lucide-react";
+import { ChevronDown, Film, Video, Image as ImageIcon, Clock, Music2 } from "lucide-react";
 
 export type DropdownToolItem = {
   href: string;
@@ -14,6 +14,13 @@ export type DropdownToolItem = {
 };
 
 export const DROPDOWN_TOOLS: DropdownToolItem[] = [
+  {
+    href: "/instagram-reels-downloader",
+    label: "Instagram Reels Downloader",
+    icon: Film,
+    iconBg: "rgba(236, 95, 168, 0.12)",
+    iconColor: "#ec5fa8",
+  },
   {
     href: "/instagram-video-downloader",
     label: "Instagram Video Downloader",
@@ -48,10 +55,18 @@ export default function ToolCategoryDropdown() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
 
   const isReelsActive = pathname === "/instagram-reels-downloader" || pathname === "/";
 
-  // Close on outside click
+  const close = useCallback((refocusToggle = false) => {
+    setOpen(false);
+    if (refocusToggle) toggleRef.current?.focus();
+  }, []);
+
+  // Close on outside click / touch
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: MouseEvent | TouchEvent) => {
@@ -67,15 +82,47 @@ export default function ToolCategoryDropdown() {
     };
   }, [open]);
 
-  // Close on Escape
+  // Close on Escape (anywhere) and return focus to the toggle
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        close(true);
+      }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open]);
+  }, [open, close]);
+
+  // Arrow-key navigation inside the menu: Up/Down/Home/End move between
+  // items, Tab closes the menu (focus moves naturally, no trap).
+  const onMenuKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const items = Array.from(
+        menuRef.current?.querySelectorAll<HTMLElement>("[role='menuitem']") ?? []
+      );
+      if (items.length === 0) return;
+      const active = document.activeElement as HTMLElement | null;
+      const idx = active ? items.indexOf(active) : -1;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        items[(idx + 1 + items.length) % items.length]?.focus();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        items[(idx - 1 + items.length) % items.length]?.focus();
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        items[0]?.focus();
+      } else if (e.key === "End") {
+        e.preventDefault();
+        items[items.length - 1]?.focus();
+      } else if (e.key === "Tab") {
+        close();
+      }
+    },
+    [close]
+  );
 
   const toggle = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -83,7 +130,18 @@ export default function ToolCategoryDropdown() {
     setOpen((prev) => !prev);
   };
 
-  const close = () => setOpen(false);
+  // ArrowDown on the toggle opens the menu and focuses the first item.
+  const onToggleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+      if (!open && (e.key === "ArrowDown" || e.key === " ")) e.preventDefault();
+      if (e.key === "ArrowDown" && !open) {
+        setOpen(true);
+        requestAnimationFrame(() => {
+          menuRef.current?.querySelector<HTMLElement>("[role='menuitem']")?.focus();
+        });
+      }
+    }
+  };
 
   return (
     <div ref={containerRef} className="relative inline-flex items-center">
@@ -97,16 +155,19 @@ export default function ToolCategoryDropdown() {
       >
         <Link
           href="/instagram-reels-downloader"
-          onClick={close}
+          onClick={() => close()}
           className="px-3 py-1.5 text-[14.5px] font-semibold transition-colors focus-visible:outline-none"
         >
           Instagram Reels Downloader
         </Link>
         <button
+          ref={toggleRef}
           type="button"
           onClick={toggle}
+          onKeyDown={onToggleKeyDown}
           aria-haspopup="menu"
           aria-expanded={open}
+          aria-controls={menuId}
           aria-label="Toggle Instagram downloaders menu"
           className="flex h-8 w-8 items-center justify-center rounded-full pr-1 text-fg-muted transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
@@ -119,18 +180,27 @@ export default function ToolCategoryDropdown() {
         </button>
       </div>
 
-      {/* Clean premium glassmorphism dropdown directly below */}
-      {open && (
-        <div
-          role="menu"
-          aria-label="Instagram downloaders"
-          className="absolute left-0 top-full z-50 mt-2 w-[270px] overflow-hidden rounded-2xl p-1.5 backdrop-blur-xl animate-fade-in"
-          style={{
-            background: "var(--card)",
-            border: "1px solid var(--border)",
-            boxShadow: "0 14px 40px rgba(60, 40, 120, 0.12), 0 4px 12px rgba(0, 0, 0, 0.05)",
-          }}
-        >
+      {/* Clean premium glassmorphism dropdown directly below.
+          Always mounted so open/close animates smoothly (opacity + transform
+          only — never layout geometry, never a layout shift). */}
+      <div
+        ref={menuRef}
+        id={menuId}
+        role="menu"
+        aria-label="Instagram downloaders"
+        aria-hidden={!open}
+        onKeyDown={onMenuKeyDown}
+        className={`absolute left-0 top-full z-50 w-[270px] overflow-hidden rounded-2xl p-1.5 backdrop-blur-xl transition-all duration-200 ease-out ${
+          open
+            ? "visible mt-2 translate-y-0 scale-100 opacity-100"
+            : "invisible mt-2 -translate-y-1 scale-[0.98] opacity-0 pointer-events-none"
+        }`}
+        style={{
+          background: "var(--card)",
+          border: "1px solid var(--border)",
+          boxShadow: "0 14px 40px rgba(60, 40, 120, 0.12), 0 4px 12px rgba(0, 0, 0, 0.05)",
+        }}
+      >
           <div className="space-y-1">
             {DROPDOWN_TOOLS.map((tool) => {
               const Icon = tool.icon;
@@ -140,8 +210,8 @@ export default function ToolCategoryDropdown() {
                   key={tool.href}
                   href={tool.href}
                   role="menuitem"
-                  tabIndex={0}
-                  onClick={close}
+                  tabIndex={open ? 0 : -1}
+                  onClick={() => close()}
                   className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-medium transition-all duration-150 ${
                     isSelected
                       ? "bg-primary-light text-primary font-semibold"
@@ -159,8 +229,7 @@ export default function ToolCategoryDropdown() {
               );
             })}
           </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

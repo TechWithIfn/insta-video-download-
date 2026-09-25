@@ -363,7 +363,7 @@ function VideoPlayer({ src, poster, mediaType, width, height, onDurationChange, 
   }
 
   return (
-    <div ref={playerRef} className="relative overflow-hidden rounded-[20px]" style={{ background: "#0a0a14" }}>
+    <div ref={playerRef} className="media-mount relative overflow-hidden rounded-[20px]" style={{ background: "#0a0a14" }}>
       <div className="relative w-full media-frame" style={aspectRatioStyle(width, height, "9/16")}>
         <video
           ref={videoRef}
@@ -502,7 +502,7 @@ function AudioPlayer({ src, onDurationChange }: { src: string; onDurationChange?
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="overflow-hidden rounded-[20px]" style={{ background: "linear-gradient(145deg, #1a1028 0%, #0f0c1b 100%)" }}>
+    <div className="media-mount overflow-hidden rounded-[20px]" style={{ background: "linear-gradient(145deg, #1a1028 0%, #0f0c1b 100%)" }}>
       <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
 
       {/* Waveform + Play */}
@@ -655,6 +655,9 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
   // MediaResult remounts per result (parent key), so these reset naturally.
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [imgFailed, setImgFailed] = useState(false);
+  // Tracks the current slide's decode so the reserved-space loading state
+  // shows until the bitmap is ready, then fades in (opacity only, no layout).
+  const [imgLoaded, setImgLoaded] = useState(false);
   const imgRetriedRef = useRef(false);
   // Stable fallback message for the audio fetch below: reading it from a ref
   // keeps the fetch effect from re-running on language switches.
@@ -801,6 +804,14 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
     return () => controller.abort();
   }, [isAudio, result.sourceUrl, audioUrl, audioError]);
 
+  // Revoke blob object URLs when superseded or unmounted — otherwise every
+  // audio resolve leaks the full MP3 blob for the lifetime of the tab.
+  useEffect(() => {
+    return () => {
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    };
+  }, [audioUrl]);
+
   const handleDownloadVideo = useCallback(() => {
     if (!currentMedia || downloading === "preparing") return;
     setDownloading("preparing");
@@ -840,6 +851,29 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
 
   // Media stream URL through our proxy (source allows stale-URL recovery)
   const streamSrc = currentMedia ? getStreamUrl(currentMedia.url, result.sourceUrl) : "";
+
+  // Reserve the image's own ratio before the bytes arrive (CLS fix): with
+  // width 100% + aspect-ratio, the box has its final height pre-load, so
+  // neither the first paint nor slide switches move surrounding layout.
+  const imgAspect =
+    currentMedia &&
+    currentMedia.type !== "video" &&
+    currentMedia.width &&
+    currentMedia.height &&
+    currentMedia.width > 0 &&
+    currentMedia.height > 0
+      ? `${currentMedia.width} / ${currentMedia.height}`
+      : undefined;
+
+  // Reset the loaded flag per media item during render (React "adjust state
+  // on change" pattern — synchronous, so the fresh slide never inherits the
+  // previous slide's loaded flag for even one frame). The slide was
+  // preloaded + cached before the switch, so the fade is instant.
+  const [loadedSrc, setLoadedSrc] = useState(streamSrc);
+  if (loadedSrc !== streamSrc) {
+    setLoadedSrc(streamSrc);
+    setImgLoaded(false);
+  }
 
   const logPreviewDiag = useCallback(
     (mediaType: string | undefined) => {
@@ -1008,6 +1042,11 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
                 {audioUrl && <AudioPlayer src={audioUrl} onDurationChange={(d) => setAudioDuration(d)} />}
               </>
             ) : !currentMedia ? null : currentMedia.type === "video" ? (
+              // NOTE: keying by URL intentionally remounts per source. That
+              // resets playing/time/mute state for the new video AND unmounts
+              // the old <video> element, which stops its decode — so the
+              // previous video can never keep playing (or play simultaneously)
+              // after a slide switch, a new search, or leaving the preview.
               <VideoPlayer
                 key={currentMedia.url}
                 src={streamSrc}
@@ -1029,15 +1068,31 @@ function MediaResult({ result, mode, onReset }: MediaResultProps) {
               // Natural-height render: the image keeps its own aspect ratio
               // (portrait / landscape / square) with object-fit contain, so it
               // is never cropped, stretched, or boxed into a fixed ratio.
-              // eslint-disable-next-line @next/next/no-img-element -- next/image cannot serve our dynamic backend /api/stream proxy URLs; plain img streams from our own backend exactly like <video> does
-              <img
-                key={currentMedia.url}
-                src={imgSrc ?? streamSrc}
-                alt={result.title ? decodeHtmlEntities(result.title).slice(0, 120) : t.typeBadges.photo}
-                className="media-frame media-natural w-full rounded-[20px] object-contain"
-                style={{ background: "#0a0a14", aspectRatio: "auto", height: "auto", display: "block" } as React.CSSProperties}
-                onError={handleImgError}
-              />
+              // The wrapper reserves that ratio pre-load (no CLS); the bitmap
+              // fades in on decode (opacity only, no layout, no flash).
+              <div
+                className="relative w-full overflow-hidden rounded-[20px]"
+                style={{ background: "#0a0a14", aspectRatio: imgAspect ?? "auto" }}
+              >
+                {!imgLoaded && !imgFailed && (
+                  <div aria-hidden="true" className="absolute inset-0 flex min-h-[180px] items-center justify-center">
+                    <svg className="h-8 w-8 animate-spin text-white/40" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                      <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" className="opacity-75" />
+                    </svg>
+                  </div>
+                )}
+                {/* eslint-disable-next-line @next/next/no-img-element -- next/image cannot serve our dynamic backend /api/stream proxy URLs; plain img streams from our own backend exactly like <video> does */}
+                <img
+                  key={currentMedia.url}
+                  src={imgSrc ?? streamSrc}
+                  alt={result.title ? decodeHtmlEntities(result.title).slice(0, 120) : t.typeBadges.photo}
+                  onLoad={() => setImgLoaded(true)}
+                  onError={handleImgError}
+                  className="media-frame media-natural relative w-full rounded-[20px] object-contain"
+                  style={{ background: "transparent", aspectRatio: imgAspect ?? "auto", height: "auto", display: "block", opacity: imgLoaded ? 1 : 0, transition: "opacity 180ms ease-out" } as React.CSSProperties}
+                />
+              </div>
             )}
               {/* Overlay carousel arrows: vertically centered on the media
                   edges, visible without covering important content. */}
@@ -1373,7 +1428,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
       <div className="mx-auto w-full max-w-[1240px] min-w-0 px-4 sm:px-6 lg:px-8 xl:px-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8 xl:gap-12 items-center">
           {/* Left Content Column */}
-          <div className="lg:col-span-7 flex flex-col text-left">
+          <div className="lg:col-span-7 min-w-0 flex flex-col text-left">
             <div
               className="animate-fade-in-up mb-4 inline-flex max-w-full items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-semibold tracking-wide text-fg-muted sm:mb-5 sm:gap-2 sm:px-4 sm:text-xs self-start"
               style={{ background: "var(--card)", boxShadow: "var(--shadow-card)", border: "1px solid var(--border)" }}
@@ -1383,15 +1438,15 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
               <span className="truncate">{t.hero.badge}</span>
             </div>
 
-            <h1 className="animate-fade-in-up delay-100" style={{ lineHeight: 1.12 }}>
+            <h1 className="animate-fade-in-up delay-100 max-w-full text-balance break-words" style={{ lineHeight: 1.12 }}>
               <span
-                className="hero-title-a block text-[32px] sm:text-[42px] xl:text-[48px] font-extrabold text-fg tracking-tight"
+                className="hero-title-a block text-balance break-words text-[32px] sm:text-[42px] xl:text-[48px] font-extrabold text-fg tracking-tight"
                 style={{ fontFamily: "var(--font-sans)" }}
               >
                 Instagram Downloader –
               </span>
               <span
-                className="hero-title-b block text-[28px] sm:text-[38px] xl:text-[44px] font-bold italic"
+                className="hero-title-b block text-balance break-words text-[28px] sm:text-[38px] xl:text-[44px] font-bold italic"
                 style={{
                   fontFamily: "var(--font-accent)",
                   background: "var(--brand-gradient-text)",
@@ -1617,7 +1672,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
           </div>
 
           {/* Right Visual Column (Phone + 4 Floating Cards: Reels, Photos, Stories, Audio - NO highlights) */}
-          <div className="hidden lg:flex lg:col-span-5 items-center justify-center relative py-6">
+          <div className="hidden lg:flex lg:col-span-5 min-w-0 items-center justify-center relative py-6">
             <div className="relative w-full max-w-[320px] xl:max-w-[340px] flex items-center justify-center">
               {/* Phone Mockup Frame */}
               <div
@@ -1694,7 +1749,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
 
               {/* Floating Card 1: Reels (Top-Left) */}
               <div
-                className="animate-float-1 absolute -left-8 top-10 flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 backdrop-blur-xl transition-transform hover:scale-105"
+                className="animate-float-1 absolute -left-4 xl:-left-8 top-10 flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 backdrop-blur-xl transition-transform hover:scale-105"
                 style={{
                   background: "var(--card)",
                   border: "1px solid var(--border)",
@@ -1715,7 +1770,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
 
               {/* Floating Card 2: Stories (Top-Right) */}
               <div
-                className="animate-float-2 absolute -right-8 top-20 flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 backdrop-blur-xl transition-transform hover:scale-105"
+                className="animate-float-2 absolute -right-4 xl:-right-8 top-20 flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 backdrop-blur-xl transition-transform hover:scale-105"
                 style={{
                   background: "var(--card)",
                   border: "1px solid var(--border)",
@@ -1736,7 +1791,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
 
               {/* Floating Card 3: Audio (Bottom-Left) */}
               <div
-                className="animate-float-2 absolute -left-8 bottom-16 flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 backdrop-blur-xl transition-transform hover:scale-105"
+                className="animate-float-2 absolute -left-4 xl:-left-8 bottom-16 flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 backdrop-blur-xl transition-transform hover:scale-105"
                 style={{
                   background: "var(--card)",
                   border: "1px solid var(--border)",
@@ -1757,7 +1812,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
 
               {/* Floating Card 4: Photos (Bottom-Right) */}
               <div
-                className="animate-float-1 absolute -right-8 bottom-8 flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 backdrop-blur-xl transition-transform hover:scale-105"
+                className="animate-float-1 absolute -right-4 xl:-right-8 bottom-8 flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 backdrop-blur-xl transition-transform hover:scale-105"
                 style={{
                   background: "var(--card)",
                   border: "1px solid var(--border)",

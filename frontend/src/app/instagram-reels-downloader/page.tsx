@@ -72,7 +72,7 @@ export default function ReelsDownloaderPage() {
 
           <h2 className="mt-12 text-[22px] font-bold text-fg">Why save Instagram Reels to your phone</h2>
           <p className="mt-3 text-[15px] leading-[1.7] text-fg-muted">
-            Reels are short vertical videos that disappear in your feed. Saving a public reel lets you watch it offline, share it in presentations, or keep inspiration for later. Downloadit is an Instagram reel saver and MP4 converter in one — paste a link and get an MP4 without creating an Instagram account.
+            Reels are short vertical videos that disappear in your feed. Saving a public reel lets you watch it offline, share it in presentations, or keep inspiration for later. Whether you searched for an insta reels downloader, an insta reel download for your phone, or a reel saver, the flow is the same — paste a public link and get an MP4 without creating an Instagram account.
           </p>
 
           <h2 className="mt-10 text-[18px] font-bold text-fg">Limitations for private content</h2>
@@ -110,6 +110,10 @@ export default function ReelsDownloaderPage() {
               <details className="group rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
                 <summary className="cursor-pointer text-[15px] font-semibold text-fg">Do I need to log in to download reels?</summary>
                 <p className="mt-2 text-[14px] leading-[1.6] text-fg-muted">No. Paste the public Reels link and download without login. No account or password is ever requested.</p>
+              </details>
+              <details className="group rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                <summary className="cursor-pointer text-[15px] font-semibold text-fg">How do I save Instagram Reels to my phone?</summary>
+                <p className="mt-2 text-[14px] leading-[1.6] text-fg-muted">Copy the reel link in the Instagram app, paste it into Downloadit on this page, preview the MP4, and tap Download. The file saves to your phone gallery or downloads folder.</p>
               </details>
             </div>
           </section>
