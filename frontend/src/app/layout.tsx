@@ -2,7 +2,13 @@ import type { Metadata, Viewport } from "next";
 import { Poppins, Lora } from "next/font/google";
 import Script from "next/script";
 import { LanguageProvider } from "@/i18n";
-import { BRAND_DESCRIPTION, BRAND_NAME, BRAND_TITLE, HOME_OG_IMAGE_ALT, SITE_URL } from "@/config/site";
+import {
+  BRAND_DESCRIPTION,
+  BRAND_NAME,
+  BRAND_TITLE,
+  HOME_OG_IMAGE_ALT,
+  SITE_URL,
+} from "@/config/site";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -35,7 +41,14 @@ export const metadata: Metadata = {
     siteName: BRAND_NAME,
     url: SITE_URL,
     locale: "en_US",
-    images: [{ url: "/og-downloadit.png", width: 1200, height: 630, alt: HOME_OG_IMAGE_ALT }],
+    images: [
+      {
+        url: "/og-downloadit.png",
+        width: 1200,
+        height: 630,
+        alt: HOME_OG_IMAGE_ALT,
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
@@ -52,7 +65,11 @@ export const metadata: Metadata = {
       { url: "/favicon-48x48.png", sizes: "48x48", type: "image/png" },
     ],
     apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      {
+        url: "/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
     ],
     shortcut: "/favicon.ico",
   },
@@ -69,8 +86,14 @@ export const viewport: Viewport = {
   maximumScale: 5,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f4fa" },
-    { media: "(prefers-color-scheme: dark)", color: "#0e0c1b" },
+    {
+      media: "(prefers-color-scheme: light)",
+      color: "#f5f4fa",
+    },
+    {
+      media: "(prefers-color-scheme: dark)",
+      color: "#0e0c1b",
+    },
   ],
 };
 
@@ -86,6 +109,15 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        {/* Google AdSense */}
+        <Script
+          id="google-adsense"
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8543183124286362"
+          crossOrigin="anonymous"
+        />
+
+        {/* Website Structured Data */}
         <Script
           id="website-structured-data"
           type="application/ld+json"
@@ -94,11 +126,16 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "WebSite",
               name: BRAND_NAME,
-              alternateName: ["Downloadit.pro", "Downloadit Instagram Downloader"],
+              alternateName: [
+                "Downloadit.pro",
+                "Downloadit Instagram Downloader",
+              ],
               url: SITE_URL,
             }),
           }}
         />
+
+        {/* Organization Structured Data */}
         <Script
           id="organization-structured-data"
           type="application/ld+json"
@@ -112,6 +149,8 @@ export default function RootLayout({
             }),
           }}
         />
+
+        {/* Web Application Structured Data */}
         <Script
           id="webapp-structured-data"
           type="application/ld+json"
@@ -132,6 +171,8 @@ export default function RootLayout({
             }),
           }}
         />
+
+        {/* Theme Initialization */}
         <Script
           id="downloadit-theme-init"
           strategy="beforeInteractive"
@@ -143,10 +184,11 @@ export default function RootLayout({
                   // No saved preference (or anything else) => Light Mode.
                   // System/OS theme is deliberately ignored.
                   var t = localStorage.getItem('downloadit-theme');
+
                   if (t === 'dark') {
-                    document.documentElement.setAttribute('data-theme','dark');
+                    document.documentElement.setAttribute('data-theme', 'dark');
                   } else {
-                    document.documentElement.setAttribute('data-theme','light');
+                    document.documentElement.setAttribute('data-theme', 'light');
                   }
                 } catch(e) {}
               })();
@@ -154,6 +196,7 @@ export default function RootLayout({
           }}
         />
       </head>
+
       <body className="min-h-full flex flex-col antialiased">
         <LanguageProvider>{children}</LanguageProvider>
       </body>
