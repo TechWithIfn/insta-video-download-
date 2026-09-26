@@ -1,6 +1,8 @@
 import type { MediaItem } from "./types.js";
 import { logger } from "./logger.js";
-import { UPSTREAM_HEADERS } from "./media-proxy.js";
+import { UPSTREAM_HEADERS, isAllowedMediaUrl } from "./media-proxy.js";
+import { getGate } from "./capacity.js";
+import { readBoundedInt } from "./env.js";
 
 /**
  * Best-effort metadata enrichment for resolved media items.
@@ -24,6 +26,20 @@ import { UPSTREAM_HEADERS } from "./media-proxy.js";
 
 const PROBE_TIMEOUT_MS = parseInt(process.env.MEDIA_PROBE_TIMEOUT_MS || "5000", 10);
 const MAX_PROBE_BYTES = 64 * 1024;
+
+/**
+ * Hard cap on probes per batch. A 10-slide carousel used to fan out up to 20
+ * simultaneous upstream requests (HEAD + ranged GET per item); this bounds the
+ * fan-out so metadata enrichment can never become the dominant source of
+ * outbound load.
+ */
+const MAX_CONCURRENT_PROBES_PER_BATCH = readBoundedInt("MAX_PROBES_PER_BATCH", 4, 1, 32);
+
+/**
+ * Total items examined per batch. Probing is best-effort metadata, so a very
+ * large collection is sampled rather than probed exhaustively.
+ */
+const MAX_PROBE_ITEMS_PER_BATCH = readBoundedInt("MAX_PROBE_ITEMS_PER_BATCH", 12, 1, 64);
 
 export interface ImageDimensions {
   width: number;
@@ -177,24 +193,41 @@ function sizeFromHeaders(headers: Headers): number | null {
   return null;
 }
 
-async function fetchBounded(url: string, init: RequestInit): Promise<Response | null> {
+async function fetchBounded(
+  url: string,
+  init: RequestInit,
+  signal?: AbortSignal
+): Promise<Response | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  timer.unref?.();
+  const onExternalAbort = (): void => controller.abort();
+  signal?.addEventListener("abort", onExternalAbort, { once: true });
   try {
-    const res = await fetch(url, { ...init, signal: controller.signal, redirect: "manual" });
+    const res = await fetch(url, {
+      ...init,
+      signal: controller.signal,
+      redirect: "manual",
+    });
     return res;
   } catch {
     return null;
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener("abort", onExternalAbort);
   }
 }
 
 /**
  * Probe a single item. Never throws: on any failure the original item is
  * returned untouched.
+ *
+ * SSRF guard: the probe target must pass the SAME CDN allowlist the media
+ * proxy enforces. Previously any http/https host was fetched, so a
+ * scrape/provider-derived URL could make the backend issue requests to
+ * internal services (including cloud metadata) on every resolve.
  */
-async function probeItem(item: MediaItem): Promise<MediaItem> {
+async function probeItem(item: MediaItem, signal?: AbortSignal): Promise<MediaItem> {
   try {
     const needsSize = typeof item.size !== "number" || item.size <= 0;
     const needsFormat = !item.format;
@@ -207,13 +240,20 @@ async function probeItem(item: MediaItem): Promise<MediaItem> {
     } catch {
       return item;
     }
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return item;
+    if (parsed.protocol !== "https:") return item;
+    if (!isAllowedMediaUrl(item.url)) {
+      logger.warn("[enrich] skipping probe for non-allowlisted host", {
+        hostname: parsed.hostname,
+      });
+      return item;
+    }
+    if (signal?.aborted) return item;
 
     let next: MediaItem = item;
 
     if (item.type === "video" || !needsDims) {
       // Cheap path: headers only.
-      const head = await fetchBounded(item.url, { method: "HEAD", headers: { ...UPSTREAM_HEADERS } });
+      const head = await fetchBounded(item.url, { method: "HEAD", headers: { ...UPSTREAM_HEADERS } }, signal);
       if (head && head.ok) {
         if (needsSize) {
           const s = sizeFromHeaders(head.headers);
@@ -233,10 +273,14 @@ async function probeItem(item: MediaItem): Promise<MediaItem> {
     // Image path (or header probe failed): one ranged GET gives headers plus
     // enough body bytes to parse real dimensions. Body is capped at 64 KB.
     if (item.type === "image" && (needsDims || needsSize || needsFormat)) {
-      const res = await fetchBounded(item.url, {
-        method: "GET",
-        headers: { ...UPSTREAM_HEADERS, Range: `bytes=0-${MAX_PROBE_BYTES - 1}` },
-      });
+      const res = await fetchBounded(
+        item.url,
+        {
+          method: "GET",
+          headers: { ...UPSTREAM_HEADERS, Range: `bytes=0-${MAX_PROBE_BYTES - 1}` },
+        },
+        signal
+      );
       if (!res || (!res.ok && res.status !== 206)) {
         await res?.body?.cancel().catch(() => {});
         return next;
@@ -268,15 +312,64 @@ async function probeItem(item: MediaItem): Promise<MediaItem> {
   }
 }
 
+/** Run `tasks` with at most `limit` in flight, preserving input order. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+  signal?: AbortSignal
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= items.length) return;
+      if (signal?.aborted) return;
+      results[index] = await fn(items[index] as T, index);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+export interface EnrichOptions {
+  signal?: AbortSignal;
+}
+
 /**
- * Enrich every item in parallel (bounded, best-effort). Never throws and
- * never changes the number or order of items.
+ * Enrich items with bounded concurrency. Never throws, never changes the number
+ * or order of items. Probes are additionally admitted through the global
+ * `probe` gate, so a burst of concurrent resolves cannot multiply the probe
+ * fan-out across the process.
  */
-export async function enrichMediaItems(items: MediaItem[]): Promise<MediaItem[]> {
+export async function enrichMediaItems(
+  items: MediaItem[],
+  options: EnrichOptions = {}
+): Promise<MediaItem[]> {
   if (items.length === 0) return items;
+  const { signal } = options;
+
+  const candidates = items.slice(0, MAX_PROBE_ITEMS_PER_BATCH);
+  const gate = getGate("probe");
+
   try {
-    const settled = await Promise.allSettled(items.map((item) => probeItem(item)));
-    return settled.map((r, i) => (r.status === "fulfilled" ? r.value : items[i]));
+    const probed = await mapWithConcurrency(
+      candidates,
+      MAX_CONCURRENT_PROBES_PER_BATCH,
+      async (item, index) => {
+        // A saturated probe budget must degrade metadata, never fail the
+        // resolve: fall back to the untouched original item.
+        try {
+          return await gate.run(() => probeItem(item, signal), { waitMs: 0, signal });
+        } catch {
+          return items[index] as MediaItem;
+        }
+      },
+      signal
+    );
+    // Items never probed keep their original values untouched.
+    return [...probed, ...items.slice(candidates.length)];
   } catch (err) {
     logger.warn("[enrich] probe batch failed", { error: err instanceof Error ? err.message : "unknown" });
     return items;

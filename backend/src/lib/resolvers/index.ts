@@ -6,11 +6,21 @@ import { resolveAudioPage, isAudioPageUrl } from "../audio-resolve.js";
 import { resolveStoryUrl, isStoryOrHighlightUrl } from "../story-resolve.js";
 import { hashUrl } from "../crypto.js";
 import { logger } from "../logger.js";
+import { getGate } from "../capacity.js";
+import { readBoundedInt } from "../env.js";
+import { inc, observe } from "../metrics.js";
 
 let resolverInstance: InstagramResolver | null = null;
 let lastProviderName: string | null = null;
 
 const inflight = new Map<string, Promise<ResolverResult>>();
+
+/**
+ * Hard bound on distinct in-flight resolutions. Coalescing already collapses
+ * identical URLs; this caps the total so a flood of distinct URLs cannot build
+ * an unbounded promise map (each entry pins a provider/browser slot).
+ */
+const MAX_INFLIGHT_RESOLUTIONS = readBoundedInt("MAX_INFLIGHT_RESOLUTIONS", 64, 1, 512);
 
 function getResolver(): InstagramResolver {
   const currentProvider = process.env.RESOLVER_PROVIDER || "placeholder";
@@ -103,6 +113,22 @@ export interface ResolveOptions {
    * is still stored, keeping the cache warm for subsequent requests.
    */
   bypassCache?: boolean;
+  /**
+   * Cancellation for provider work (client disconnect / shutdown). A queued
+   * admission wait and a running browser operation both observe it.
+   */
+  signal?: AbortSignal;
+}
+
+/**
+ * True when this exact URL is already being resolved, so a new caller will
+ * join the existing in-flight work instead of starting a second provider
+ * call. Used by per-client admission: joining an in-flight resolution costs
+ * no extra browser page or provider slot, so it must not be throttled as if it
+ * were new work.
+ */
+export function isResolutionInFlight(url: string): boolean {
+  return inflight.has(hashUrl(url));
 }
 
 export async function resolveUrl(
@@ -110,6 +136,9 @@ export async function resolveUrl(
   onProgress?: ResolveProgressCallback,
   opts?: ResolveOptions
 ): Promise<ResolverResult> {
+  const signal = opts?.signal;
+  const startedAt = Date.now();
+
   if (!opts?.bypassCache) {
     const lookupStart = Date.now();
     const cached = getCachedResult(url);
@@ -120,21 +149,40 @@ export async function resolveUrl(
         lookupMs: Date.now() - lookupStart,
       });
       onProgress?.(90, "Cached result found");
+      observe("resolve", Date.now() - startedAt);
       return cached;
     }
   } else {
+    // A known-bad signed CDN URL: the cached copy is dropped so the fresh
+    // provider result below replaces it instead of leaving a dead entry.
     deleteCachedResult(url);
+    inc("cacheRefreshes");
   }
 
   const key = hashUrl(url);
   const existing = inflight.get(key);
   if (existing) {
     logger.info("Request coalesced", { url: url.slice(0, 80) });
+    inc("coalescedResolutions");
     onProgress?.(30, "Joining active resolution");
     const result = await existing;
     onProgress?.(95, "Preparing result");
+    observe("resolve", Date.now() - startedAt);
     return result;
   }
+
+  if (inflight.size >= MAX_INFLIGHT_RESOLUTIONS) {
+    // Refuse before creating another promise: a controlled 503 beats an
+    // unbounded map of pending resolutions.
+    logger.warn("Too many distinct in-flight resolutions", {
+      inflight: inflight.size,
+      limit: MAX_INFLIGHT_RESOLUTIONS,
+    });
+    const { createError } = await import("../errors.js");
+    throw createError("CAPACITY_EXHAUSTED");
+  }
+
+  const providerGate = getGate("provider");
 
   const promise = (async () => {
     // Phase timings below feed the dev observability logs: provider network
@@ -145,8 +193,8 @@ export async function resolveUrl(
     // no playable media of their own and need the dedicated audio lookup.
     if (isAudioPageUrl(url)) {
       logger.info("Resolving via dedicated audio lookup", { url: url.slice(0, 80) });
-      const audio = await resolveAudioPage(url, onProgress);
-      const media = await enrichMediaItems(audio.media);
+      const audio = await providerGate.run(() => resolveAudioPage(url, onProgress), { signal });
+      const media = await enrichMediaItems(audio.media, { signal });
       const result: ResolverResult = { ...audio, media };
       logger.info("Audio resolve normalized", {
         type: result.type,
@@ -168,10 +216,13 @@ export async function resolveUrl(
     const providerName = process.env.RESOLVER_PROVIDER || "placeholder";
     if (isStoryOrHighlightUrl(url) && providerName !== "mock") {
       logger.info("Resolving via dedicated story resolver", { url: url.slice(0, 80) });
-      const storyResult = await resolveStoryUrl(url, onProgress);
+      const storyResult = await providerGate.run(
+        () => resolveStoryUrl(url, onProgress),
+        { signal }
+      );
       const normalized = normalizeResultType(storyResult);
       const unique = dedupeExactUrls(normalized.media);
-      const enriched = await enrichMediaItems(unique);
+      const enriched = await enrichMediaItems(unique, { signal });
       const media = dedupeMediaItems(enriched);
       const result: ResolverResult = { ...normalized, media };
       logger.info("Story resolve normalized", {
@@ -193,14 +244,23 @@ export async function resolveUrl(
       url: url.slice(0, 80),
     });
     onProgress?.(25, "Starting resolution");
-    const raw = await resolver.resolve(url, onProgress);
+    // The provider gate is the single choke point for expensive resolution
+    // work (browser pages, upstream API calls). It bounds concurrency and
+    // returns a controlled 503 when the queue window elapses.
+    const raw = await providerGate.run(() => {
+      const providerStart = Date.now();
+      inc("providerResolutions");
+      return resolver.resolve(url, onProgress).finally(() => {
+        observe("provider", Date.now() - providerStart);
+      });
+    }, { signal });
     const normalized = normalizeResultType(raw);
     // Collapse exact duplicates before probing so the same bytes are never
     // fetched twice, then fill gaps the provider left (size/format/dims)
     // from the real media bytes, then collapse same-image renditions keeping
     // the largest copy. The final list is what gets cached.
     const unique = dedupeExactUrls(normalized.media);
-    const enriched = await enrichMediaItems(unique);
+    const enriched = await enrichMediaItems(unique, { signal });
     const media = dedupeMediaItems(enriched);
     const result: ResolverResult = { ...normalized, media };
     logger.info("Resolve normalized", {
@@ -221,7 +281,14 @@ export async function resolveUrl(
   try {
     const result = await promise;
     onProgress?.(95, "Preparing result");
+    observe("resolve", Date.now() - startedAt);
     return result;
+  } catch (err) {
+    // A failure is never cached and the in-flight entry is removed below, so
+    // one bad resolve cannot poison later requests for the same URL. Count it
+    // so a rising provider failure rate is visible before users report it.
+    inc("providerFailures");
+    throw err;
   } finally {
     inflight.delete(key);
   }

@@ -4,11 +4,21 @@ import type {
   InstagramContentType,
   Author,
   ResolveProgressCallback,
+  ResolveCallOptions,
 } from "../types.js";
 import { BaseProvider, isCdnMediaHost } from "./base.js";
-import { createError } from "../errors.js";
+import { createError, isConnectionLostError, isTimeoutError, AppError } from "../errors.js";
 import { logger } from "../logger.js";
 import { decodeHtmlEntities } from "../text.js";
+import { readBoundedInt } from "../env.js";
+import { isDraining, registerCleanup } from "../shutdown.js";
+import { getGate } from "../capacity.js";
+import type { Lease } from "../capacity.js";
+import { inc } from "../metrics.js";
+
+/** Abort reasons. Distinct objects so callers can tell the cases apart. */
+const DEADLINE_REASON = { kind: "resolve-deadline" } as const;
+const CLIENT_GONE_REASON = { kind: "client-gone" } as const;
 
 let pptr: typeof import("puppeteer") | null = null;
 
@@ -32,10 +42,78 @@ export function isServerlessRuntime(): boolean {
 
 const NAVIGATION_TIMEOUT_MS = 15_000;
 const DATA_WAIT_TIMEOUT_MS = 5_000;
-const MAX_CONCURRENT_PAGES = 3;
-// Slots held longer than this are presumed leaked and reclaimed on next
-// acquire. Legitimate resolves finish an order of magnitude sooner.
-const PAGE_SLOT_STALE_MS = 120_000;
+
+/**
+ * Bounded page concurrency lives in the central capacity registry
+ * (`getGate("puppeteer")`), which reads MAX_CONCURRENT_PAGES /
+ * PUPPETEER_QUEUE_WAIT_MS / PUPPETEER_STALE_MS. See acquirePageSlot().
+ */
+
+/** Hard ceiling on one browser resolve, independent of any inner timeout. */
+const RESOLVE_DEADLINE_MS = readBoundedInt("PUPPETEER_RESOLVE_DEADLINE_MS", 45_000, 5_000, 300_000);
+
+/** How long to wait for a free page slot before refusing the resolve. */
+const PAGE_SLOT_QUEUE_MS = readBoundedInt("PUPPETEER_QUEUE_WAIT_MS", 8_000, 0, 60_000);
+
+/** How long an idle browser is kept warm before it is closed to free memory. */
+const BROWSER_IDLE_TTL_MS = readBoundedInt("PUPPETEER_BROWSER_IDLE_TTL_MS", 120_000, 10_000, 900_000);
+
+/**
+ * Never buffer more than this from a single intercepted API response. A real
+ * media payload is tens of KB; a 4 MB ceiling is generous and keeps one odd
+ * response from turning into a memory spike.
+ */
+const MAX_INTERCEPT_BODY_BYTES = readBoundedInt(
+  "PUPPETEER_MAX_INTERCEPT_BODY_BYTES",
+  4 * 1024 * 1024,
+  64 * 1024,
+  32 * 1024 * 1024
+);
+
+/**
+ * Third-party surfaces Instagram loads that are never a media source: pixel/
+ * analytics beacons, tag managers, ad SDKs. Blocking them removes real bytes
+ * and background work without touching any Instagram or fbcdn host, so media
+ * extraction is unaffected.
+ */
+const UNNECESSARY_RESOURCE_RE =
+  /googletagmanager|google-analytics|analytics\.js|\/gpt\/|doubleclick|facebook\.net\/tr|connect\.facebook|adservice\.google|pagead2\.googlesyndication|hotjar|mixpanel|amplitude|bugsnag|sentry\.io|\/rsrc\.php|\/z\.gif|\/px\.gif/i;
+
+/** Hosts that serve media or media metadata must never be blocked. */
+const MEDIA_HOST_RE = /(^|\.)(fbcdn\.net|cdninstagram\.com|instagram\.com|facebook\.com|fb\.com)$/i;
+
+export function isUnnecessaryResource(url: string, resourceType: string): boolean {
+  let host = "";
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return false;
+  }
+  // Media-bearing hosts are never blocked, whatever the path looks like.
+  if (MEDIA_HOST_RE.test(host)) return false;
+  if (resourceType === "font" || resourceType === "stylesheet") return true;
+  return UNNECESSARY_RESOURCE_RE.test(url);
+}
+
+/**
+ * Only Instagram's own API surfaces can carry media JSON. Buffering every JSON
+ * response on the page (feature flags, manifests, static config) cost time and
+ * memory on each resolve for no extraction value.
+ */
+const MEDIA_API_PATH_RE = /(\/api\/|\/graphql|web\/api\/v1)/i;
+
+export function isMediaBearingApiUrl(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "https:") return false;
+  if (!MEDIA_HOST_RE.test(parsed.hostname)) return false;
+  return MEDIA_API_PATH_RE.test(parsed.pathname);
+}
+
 const MOBILE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -888,19 +966,136 @@ export class PuppeteerProvider extends BaseProvider {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private browser: any = null;
   private launching: Promise<void> | null = null;
-  // Acquisition timestamps of held page slots (single source of truth for
-  // concurrency). Timestamps let us reclaim slots leaked by killed/frozen
-  // runtimes (e.g. a serverless instance frozen mid-resolve).
-  private pageSlots: number[] = [];
-  private pageWaiters: Array<() => void> = [];
+  private closing = false;
+  private lastUsedAt = 0;
+  /** Idle timer that releases Chromium memory when traffic goes quiet. */
+  private idleTimer: NodeJS.Timeout | null = null;
+  /** Live page-slot leases (released in `resolveInternal`'s finally). */
+  private pageSlotLeases: Lease[] = [];
+
+  /** Is the retained browser handle still attached to a live process? */
+  private isBrowserConnected(): boolean {
+    const browser = this.browser;
+    if (!browser) return false;
+    try {
+      if (typeof browser.isConnected === "function") return Boolean(browser.isConnected());
+      if (typeof browser.connected === "boolean") return browser.connected;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Drop the browser handle so the next use relaunches Chromium. Used after
+   * a dead-connection failure so the SAME URL works again on retry instead of
+   * every future resolve failing with the stale handle.
+   *
+   * `resetBrowser` is now strictly serialised: a launch already in flight is
+   * left to finish, and a handle installed after a reset is closed instead of
+   * leaked. That removes the double-launch/orphan race.
+   */
+  private resetBrowser(reason: string): void {
+    const had = Boolean(this.browser);
+    this.browser = null;
+    this.lastUsedAt = 0;
+    this.clearIdleTimer();
+    if (this.launching) {
+      // A launch is in flight. When it settles it installs its own handle;
+      // remember we want it gone so it is closed instead of retained.
+      void this.launching
+        .then(() => this.closeOrphanedBrowser())
+        .catch(() => {});
+      return;
+    }
+    if (had) {
+      logger.warn("Puppeteer browser handle reset", { reason });
+    }
+  }
+
+  /** Close a browser that was installed after a reset requested. */
+  private async closeOrphanedBrowser(): Promise<void> {
+    const orphan = this.browser;
+    this.browser = null;
+    if (!orphan) return;
+    try {
+      await orphan.close();
+      logger.info("Puppeteer orphaned browser closed");
+    } catch {
+      /* already gone */
+    }
+  }
+
+  private clearIdleTimer(): void {
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
+  }
+
+  /**
+   * Chromium keeps hundreds of MB resident. When traffic goes quiet, release
+   * it rather than holding that memory for the life of the process. The next
+   * resolve relaunches transparently.
+   */
+  private scheduleIdleRelease(): void {
+    this.clearIdleTimer();
+    if (!this.browser || BROWSER_IDLE_TTL_MS <= 0) return;
+    const timer = setTimeout(() => {
+      this.idleTimer = null;
+      if (this.pageSlotLeases.length > 0) {
+        this.scheduleIdleRelease();
+        return;
+      }
+      if (this.browser) {
+        void this.closeBrowser("idle-timeout");
+      }
+    }, BROWSER_IDLE_TTL_MS);
+    // Never let the idle timer hold the process open.
+    timer.unref?.();
+    this.idleTimer = timer;
+  }
+
+  private async closeBrowser(reason: string): Promise<void> {
+    const browser = this.browser;
+    this.browser = null;
+    this.lastUsedAt = 0;
+    this.clearIdleTimer();
+    if (!browser) return;
+    try {
+      await browser.close();
+      logger.info("Puppeteer browser closed", { reason });
+    } catch (err) {
+      logger.warn("Puppeteer browser close failed", {
+        reason,
+        error: err instanceof Error ? err.message : "unknown",
+      });
+    }
+  }
 
   private async ensureBrowser(): Promise<void> {
-    if (this.browser) return;
+    if (isDraining()) {
+      throw createError("SERVER_SHUTTING_DOWN");
+    }
+    // A retained handle can outlive the Chromium it points at (crash, OOM
+    // kill, idle teardown). Detect that up front and relaunch — otherwise
+    // every resolve after the first death fails with "Connection closed.".
+    if (this.browser && !this.isBrowserConnected()) {
+      this.resetBrowser("stale-handle-detected");
+    }
+    if (this.browser) {
+      this.lastUsedAt = Date.now();
+      this.scheduleIdleRelease();
+      return;
+    }
     if (this.launching) {
       await this.launching;
+      this.lastUsedAt = Date.now();
       return;
     }
 
+    // One launch at a time per process, ever. Concurrent launches were the
+    // source of duplicate Chromium processes under load.
     this.launching = (async () => {
       if (isServerlessRuntime()) {
         await this.launchServerless();
@@ -913,15 +1108,20 @@ export class PuppeteerProvider extends BaseProvider {
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
             "--disable-gpu",
-            "--disable-web-security",
             "--disable-features=VizDisplayCompositor",
             "--no-first-run",
             "--no-default-browser-check",
             "--disable-extensions",
             "--disable-blink-features=AutomationControlled",
+            // Bounded per-tab memory so one heavy page cannot balloon the
+            // renderer set and OOM the instance.
+            "--js-flags=--max-old-space-size=512",
+            "--renderer-process-limit=2",
           ],
         });
       }
+      this.lastUsedAt = Date.now();
+      this.scheduleIdleRelease();
 
       // Apply stealth patches manually
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -931,10 +1131,38 @@ export class PuppeteerProvider extends BaseProvider {
       }
 
       logger.info("Puppeteer browser launched (stealth-patched)");
-      this.launching = null;
-    })();
+    })()
+      .catch((err) => {
+        // Never cache a failed launch: a rejected `launching` promise would
+        // poison every later resolve. Clear it so the next attempt retries.
+        this.browser = null;
+        throw err;
+      })
+      .finally(() => {
+        this.launching = null;
+      });
 
     await this.launching;
+  }
+
+  /**
+   * Open a page with ONE bounded recovery: if the connection is already dead
+   * (the classic `Connection closed.` from a stale handle), relaunch the
+   * browser and try once more. This keeps a dead browser from becoming a
+   * user-visible failure on the very next request.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async openPageWithRecovery(): Promise<any> {
+    try {
+      await this.ensureBrowser();
+      return await this.browser!.newPage();
+    } catch (err) {
+      if (!isConnectionLostError(err)) throw err;
+      this.resetBrowser("newPage-failed");
+      logger.warn("Puppeteer newPage hit a closed connection — relaunching once");
+      await this.ensureBrowser();
+      return await this.browser!.newPage();
+    }
   }
 
   /**
@@ -969,39 +1197,30 @@ export class PuppeteerProvider extends BaseProvider {
     logger.info("Puppeteer serverless browser launched (@sparticuz/chromium)");
   }
 
-  /** Drop slots held far longer than any legitimate resolve (leak recovery). */
-  private reclaimStalePageSlots(): void {
-    const cutoff = Date.now() - PAGE_SLOT_STALE_MS;
-    while (this.pageSlots.length > 0 && this.pageSlots[0] < cutoff) {
-      this.pageSlots.shift();
-    }
-  }
-
-  /** Bounded page concurrency: fail fast instead of spawning unlimited pages. */
-  private async acquirePageSlot(): Promise<boolean> {
-    this.reclaimStalePageSlots();
-    if (this.pageSlots.length < MAX_CONCURRENT_PAGES) {
-      this.pageSlots.push(Date.now());
-      return true;
-    }
-    const waited = await new Promise<boolean>((resolve) => {
-      const timer = setTimeout(() => resolve(false), 5_000);
-      this.pageWaiters.push(() => {
-        clearTimeout(timer);
-        resolve(true);
+  /**
+   * Bounded browser concurrency. The central `puppeteer` workload gate is the
+   * single source of truth for this ceiling (limit/queue/stale are read from the
+   * same MAX_CONCURRENT_PAGES / PUPPETEER_QUEUE_WAIT_MS / PUPPETEER_STALE_MS
+   * env vars) so `/api/health/capacity` reports the REAL number of in-flight
+   * browser jobs instead of a parallel, invisible counter.
+   *
+   * Returns a lease the caller MUST release, or `null` when the queue window
+   * elapsed (a controlled 503) or the caller went away.
+   */
+  private async acquirePageSlot(signal?: AbortSignal): Promise<Lease | null> {
+    try {
+      const lease = await getGate("puppeteer").acquire({ signal, waitMs: PAGE_SLOT_QUEUE_MS });
+      this.pageSlotLeases.push(lease);
+      return lease;
+    } catch (err) {
+      if (signal?.aborted) return null;
+      logger.warn("Puppeteer page slot refused", {
+        reason: err instanceof Error ? err.message : "unknown",
+        inFlight: getGate("puppeteer").inFlight,
+        limit: getGate("puppeteer").limit,
       });
-    });
-    if (!waited) return false;
-    this.reclaimStalePageSlots();
-    if (this.pageSlots.length >= MAX_CONCURRENT_PAGES) return false;
-    this.pageSlots.push(Date.now());
-    return true;
-  }
-
-  private releasePageSlot(): void {
-    this.pageSlots.shift();
-    const next = this.pageWaiters.shift();
-    if (next) next();
+      return null;
+    }
   }
 
   /** Fast path: plain-HTML metadata already yielded a direct video URL. */
@@ -1046,16 +1265,95 @@ export class PuppeteerProvider extends BaseProvider {
     };
   }
 
-  async resolve(url: string, onProgress?: ResolveProgressCallback): Promise<ResolverResult> {
+  /**
+   * Provider entry point.
+   *
+   * Adds the two guarantees the internal implementation cannot give by itself:
+   *  - a HARD deadline, so a hung page/evaluate can never hold a page slot
+   *    and a browser connection forever;
+   *  - cancellation, so a client that disconnects (or a shutdown) stops the
+   *    expensive browser work instead of finishing into the void.
+   *
+   * The inner work is abandoned on timeout, but its page and slot are still
+   * released because the `finally` in the internal implementation runs when
+   * the page/browser is torn down; the abandoned promise is explicitly
+   * swallowed so it can never surface as an unhandled rejection.
+   */
+  async resolve(
+    url: string,
+    onProgress?: ResolveProgressCallback,
+    options?: ResolveCallOptions
+  ): Promise<ResolverResult> {
+    const controller = new AbortController();
+    const external = options?.signal;
+    const onExternalAbort = (): void => controller.abort(CLIENT_GONE_REASON);
+    external?.addEventListener("abort", onExternalAbort, { once: true });
+    inc("puppeteerJobs");
+
+    // One hard deadline per resolve. A hung page must not be able to hold a
+    // browser slot (and its Chromium memory) indefinitely.
+    const deadline = setTimeout(() => controller.abort(DEADLINE_REASON), RESOLVE_DEADLINE_MS);
+    deadline.unref?.();
+
+    const work = this.resolveInternal(url, onProgress, controller.signal).finally(() => {
+      clearTimeout(deadline);
+      external?.removeEventListener("abort", onExternalAbort);
+    });
+
+    // Fail the caller immediately on abort instead of waiting for the
+    // abandoned work to unwind; the work promise is still observed so it can
+    // never become an unhandled rejection.
+    const guard = new Promise<never>((_, reject) => {
+      controller.signal.addEventListener(
+        "abort",
+        () => {
+          if (controller.signal.reason === DEADLINE_REASON) {
+            reject(createError("PROVIDER_TIMEOUT"));
+            return;
+          }
+          const cancelled = new Error("resolve cancelled by caller");
+          cancelled.name = "AbortError";
+          reject(cancelled);
+        },
+        { once: true }
+      );
+    });
+
+    try {
+      return await Promise.race([work, guard]);
+    } catch (err) {
+      inc("puppeteerFailures");
+      throw err;
+    } finally {
+      void work.catch(() => {});
+    }
+  }
+
+  private async resolveInternal(
+    url: string,
+    onProgress: ResolveProgressCallback | undefined,
+    signal: AbortSignal
+  ): Promise<ResolverResult> {
     const startTime = Date.now();
     const timings: Record<string, number> = {};
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let page: any;
-    let slotHeld = false;
+    let slot: Lease | null = null;
     try {
+      if (signal.aborted) {
+        throw createError("PROVIDER_TIMEOUT");
+      }
       // Step 0: Fetch metadata via plain HTTP (~1s, no browser, no bot detection)
       const metaStart = Date.now();
+      // For /p/ pages the carousel fast path also needs the embed endpoint —
+      // start that GET now so it overlaps the metadata page fetch instead of
+      // paying for two sequential round-trips on every post resolve.
+      const postMatch = /instagram\.com\/p\/([A-Za-z0-9_-]+)/.exec(url);
+      const embedHtmlPromise =
+        url.includes("/p/") && postMatch?.[1]
+          ? fetchPageHtml(`https://www.instagram.com/p/${postMatch[1]}/embed/`)
+          : null;
       const fetchMeta = await fetchMetadata(url);
       timings.metadataMs = Date.now() - metaStart;
       onProgress?.(35, "Media source opened");
@@ -1130,14 +1428,10 @@ export class PuppeteerProvider extends BaseProvider {
       // sidecar collection (every slide, in order, with dimensions), unlike
       // the main page which only exposes the first slides anonymously. When
       // it yields items, the browser pass is skipped entirely.
-      if (url.includes("/p/")) {
-        const postMatch = /instagram\.com\/p\/([A-Za-z0-9_-]+)/.exec(url);
-        if (postMatch?.[1]) {
-          const embedStart = Date.now();
-          const embedHtml = await fetchPageHtml(
-            `https://www.instagram.com/p/${postMatch[1]}/embed/`
-          );
-          timings.embedMs = Date.now() - embedStart;
+      if (url.includes("/p/") && postMatch?.[1]) {
+        const embedStart = Date.now();
+        const embedHtml = embedHtmlPromise ? await embedHtmlPromise : null;
+        timings.embedMs = Date.now() - embedStart;
           const embed = embedHtml ? extractSidecarFromEmbedHtml(embedHtml) : null;
           if (embed && embed.items.length > 0) {
             const validEmbed: MediaItem[] = [];
@@ -1190,13 +1484,20 @@ export class PuppeteerProvider extends BaseProvider {
               discovered: embed.items.length,
             });
           }
-        }
       }
 
-      if (!(await this.acquirePageSlot())) {
+      const lease = await this.acquirePageSlot(signal);
+      if (!lease) {
+        // A caller that already went away gets a cancellation, not a lie about
+        // capacity: the response is never written for them either way.
+        if (signal.aborted) {
+          const cancelled = new Error("resolve cancelled by caller");
+          cancelled.name = "AbortError";
+          throw cancelled;
+        }
         throw createError("SERVER_OVERLOADED");
       }
-      slotHeld = true;
+      slot = lease;
 
       const browserStart = Date.now();
       try {
@@ -1223,7 +1524,7 @@ export class PuppeteerProvider extends BaseProvider {
         throw createError("PROVIDER_UNAVAILABLE");
       }
 
-      page = await this.browser.newPage();
+      page = await this.openPageWithRecovery();
 
       // Apply stealth patches to this page
       await applyStealthPatches(page);
@@ -1236,6 +1537,17 @@ export class PuppeteerProvider extends BaseProvider {
         "Accept-Language": "en-US,en;q=0.9",
         "X-IG-App-ID": "936619743392459",
       });
+
+      // Counters used by both the request and response listeners below. They
+      // are declared BEFORE the listeners are attached: the interception
+      // handlers run on the event loop, and a listener that closed over these
+      // bindings before their declaration would hit the temporal dead zone.
+      let blockedRequestCount = 0;
+      let jsonInspectedCount = 0;
+      let jsonSkippedCount = 0;
+      let jsonBytesRead = 0;
+      let interceptedMediaRequestCount = 0;
+      let capturedCdnMediaUrlCount = 0;
 
       // Block heavy resources we never need, but NEVER abort video/media
       // requests: media delivery responses (resourceType "media",
@@ -1254,8 +1566,9 @@ export class PuppeteerProvider extends BaseProvider {
             (type === "image" && !isStory) ||
             type === "font" ||
             type === "stylesheet" ||
-            /googletagmanager|google-analytics|facebook\.net\/tr|connect\.facebook/i.test(target)
+            isUnnecessaryResource(target, type)
           ) {
+            blockedRequestCount++;
             intercepted.abort().catch(() => {});
           } else {
             intercepted.continue().catch(() => {});
@@ -1274,8 +1587,6 @@ export class PuppeteerProvider extends BaseProvider {
       // different API endpoints (GraphQL, web API, feed, etc.) so we must
       // check ALL JSON responses for media-related keywords.
       const interceptedMedia: ExtractedMedia[] = [];
-      let interceptedMediaRequestCount = 0;
-      let capturedCdnMediaUrlCount = 0;
       // Pagination state for sidecar children: when an intercepted API page
       // reports has_next_page, the cursor is followed after the browser pass.
       // Stored on a const container because TS control-flow ignores writes
@@ -1288,8 +1599,30 @@ export class PuppeteerProvider extends BaseProvider {
           const resContentType = res.headers()["content-type"] || "";
 
           if (resContentType.includes("json")) {
+            // Only Instagram's own API surfaces carry media JSON, and buffering
+            // every JSON response on the page (config blobs, feature flags,
+            // manifests) wasted time and memory on every resolve. Anything
+            // else is skipped, and a body over the cap is never buffered.
+            if (!isMediaBearingApiUrl(resUrl)) {
+              jsonSkippedCount++;
+              return;
+            }
+            const declared = Number(res.headers()["content-length"] || "0");
+            if (Number.isFinite(declared) && declared > MAX_INTERCEPT_BODY_BYTES) {
+              jsonSkippedCount++;
+              return;
+            }
             try {
               const text = await res.text();
+              jsonInspectedCount++;
+              jsonBytesRead += text.length;
+              if (text.length > MAX_INTERCEPT_BODY_BYTES) {
+                // Defensive: a chunked response can lie about (or omit) its
+                // length. Parsing a huge body would be a memory spike, so drop
+                // it rather than risk the process.
+                jsonSkippedCount++;
+                return;
+              }
               if (
                 text.includes("video_url") ||
                 text.includes("display_url") ||
@@ -1792,6 +2125,19 @@ export class PuppeteerProvider extends BaseProvider {
         hasVideo: validMedia.some((m) => m.type === "video"),
         selectedType: orderedMedia[0]?.type ?? null,
         duration: Date.now() - startTime,
+        // Timing diagnostics: where the time actually went, so a slow resolve
+        // is attributed instead of guessed.
+        ...timings,
+        // Resource-interception diagnostics: how much work the page was allowed
+        // to do vs blocked, and how much JSON was buffered to find the media.
+        interception: {
+          blockedRequests: blockedRequestCount,
+          mediaRequests: interceptedMediaRequestCount,
+          jsonInspected: jsonInspectedCount,
+          jsonSkipped: jsonSkippedCount,
+          jsonKbRead: Math.round(jsonBytesRead / 1024),
+          cdnMediaCaptured: capturedCdnMediaUrlCount,
+        },
       });
       onProgress?.(85, "Media extracted");
 
@@ -1804,22 +2150,54 @@ export class PuppeteerProvider extends BaseProvider {
         media: orderedMedia,
       };
     } catch (error) {
-      if (error && typeof error === "object" && "code" in error) throw error;
+      // Only OUR errors (createError) may propagate as-is. Puppeteer's
+      // ProtocolError/ConnectionClosedError also carry a `code` property —
+      // checking `"code" in error` let them escape raw and reach the route
+      // as unknown failures (surfacing the generic "temporary issue").
+      if (error instanceof AppError) throw error;
 
       logger.error("Puppeteer RESOLVER_FAILED", {
         error: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : "unknown",
         url,
         duration: Date.now() - startTime,
       });
+
+      // A cancellation must not kill the shared browser for everyone else:
+      // close this page (the `finally` below) and report a plain cancellation.
+      // Only a DEADLINE means the page itself may be wedged, so that case
+      // still tears the browser down.
+      if (signal.aborted && !isConnectionLostError(error)) {
+        if (signal.reason === DEADLINE_REASON) {
+          this.resetBrowser("resolve-deadline");
+          throw createError("PROVIDER_TIMEOUT");
+        }
+        const cancelled = new Error("resolve cancelled by caller");
+        cancelled.name = "AbortError";
+        throw cancelled;
+      }
+
+      if (isConnectionLostError(error)) {
+        // Transport died mid-resolve: reset the handle so this URL works on
+        // the next attempt instead of failing forever on a dead socket.
+        this.resetBrowser("resolve-connection-lost");
+        throw createError("PROVIDER_UNAVAILABLE");
+      }
+      if (isTimeoutError(error)) {
+        throw createError("PROVIDER_TIMEOUT");
+      }
       throw createError("PROVIDER_UNAVAILABLE");
     } finally {
-      if (slotHeld) {
-        slotHeld = false;
-        this.releasePageSlot();
+      if (slot) {
+        slot.release();
+        const i = this.pageSlotLeases.indexOf(slot);
+        if (i >= 0) this.pageSlotLeases.splice(i, 1);
       }
       if (page) {
         await page.close().catch(() => {});
       }
+      this.lastUsedAt = Date.now();
+      this.scheduleIdleRelease();
     }
   }
 
@@ -1963,11 +2341,42 @@ export class PuppeteerProvider extends BaseProvider {
     return "UNKNOWN";
   }
 
+  /**
+   * Release every browser resource. Safe to call repeatedly and during
+   * shutdown: it clears the idle timer, refuses new work, waits for an
+   * in-flight launch, and closes Chromium so no orphan process survives.
+   */
   async close(): Promise<void> {
-    if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
-      logger.info("Puppeteer browser closed");
+    this.closing = true;
+    this.clearIdleTimer();
+    // Wait for an in-flight launch so we close the handle it installs rather
+    // than leaking a freshly spawned Chromium.
+    const launching = this.launching;
+    if (launching) {
+      await launching.catch(() => {});
     }
+    await this.closeBrowser("close-requested");
+    // Release every page-slot lease so a caller blocked in the gate queue is
+    // woken and refused (503) instead of waiting out the whole queue window
+    // during shutdown. The gate reclaims its own counters; the provider's
+    // `closing` flag stops new browser work.
+    for (const lease of this.pageSlotLeases) lease.release();
+    this.pageSlotLeases = [];
   }
 }
+
+// Release Chromium on graceful shutdown even when nothing calls close()
+// explicitly (e.g. a long-lived server drained by SIGTERM).
+registerCleanup("puppeteer-browser", async () => {
+  try {
+    const { getProvider } = await import("./index.js");
+    const provider = getProvider() as { close?: () => Promise<void> };
+    if (typeof provider.close === "function") {
+      await provider.close();
+    }
+  } catch (err) {
+    logger.warn("Puppeteer shutdown cleanup failed", {
+      error: err instanceof Error ? err.message : "unknown",
+    });
+  }
+});

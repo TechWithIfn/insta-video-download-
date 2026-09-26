@@ -1,17 +1,21 @@
 import { Router, Request, Response as ExpressResponse } from "express";
-import { readFile, mkdir, rm, readdir, stat } from "fs/promises";
-import { createWriteStream } from "fs";
+import { mkdir, rm, readdir, stat } from "fs/promises";
+import { createReadStream, createWriteStream } from "fs";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { randomBytes } from "crypto";
 import { validateInstagramUrl } from "../lib/validators/instagram-url.js";
+import type { ParsedInstagramUrl } from "../lib/validators/instagram-url.js";
 import { resolveUrl } from "../lib/resolvers/index.js";
-import { checkRateLimit } from "../lib/rate-limit.js";
+import { checkRateLimit, routeRateLimitConfig } from "../lib/rate-limit.js";
 import { logger } from "../lib/logger.js";
-import { AppError, createError, createErrorResponse } from "../lib/errors.js";
+import { AppError, createError, createErrorResponse, toAppError } from "../lib/errors.js";
 import { isFfmpegAvailable, runFfmpeg, getFfmpegVersionSync } from "../lib/ffmpeg.js";
+import { scheduleBackgroundTask } from "../lib/background.js";
+import { KeyedConcurrency, getGate } from "../lib/capacity.js";
+import { readBoundedInt } from "../lib/env.js";
 import {
   validateProxyUrl,
   getClientIp,
@@ -29,12 +33,23 @@ const UPSTREAM_TIMEOUT_MS = 60_000;
 const FFMPEG_TIMEOUT_MS = 60_000;
 const STALE_DIR_TTL_MS = 30 * 60 * 1000;
 const SWEEP_INTERVAL_MS = 10 * 60 * 1000;
-// FFmpeg is CPU-intensive: bound concurrent conversions, fail fast when full.
-const MAX_CONCURRENT_AUDIO_JOBS = Math.max(
-  1,
-  parseInt(process.env.MAX_CONCURRENT_AUDIO_JOBS || "2", 10) || 2
-);
-let activeAudioJobs = 0;
+
+/**
+ * Concurrency, separated by cost:
+ *  - `audio` gate caps how many audio requests run their pipeline at once.
+ *  - `ffmpeg` gate caps the number of FFmpeg CHILD PROCESSES (the real CPU
+ *    and memory cost). A request may hold an audio slot while queued for an
+ *    FFmpeg slot; that is the intended, bounded behaviour.
+ *  - per-IP cap stops one client from occupying every audio slot.
+ *
+ * The previous free-running `activeAudioJobs` counter was decremented in a
+ * `finally` that also ran for requests which never incremented it, so repeated
+ * early returns pinned the counter at 0 and disabled the limit entirely.
+ * Gates cannot drift: a lease is acquired once and released exactly once.
+ */
+const audioGate = getGate("audio");
+const ffmpegGate = getGate("ffmpeg");
+const perIpAudio = new KeyedConcurrency(readBoundedInt("MAX_CONCURRENT_AUDIO_PER_IP", 1, 1, 16));
 
 function sanitizeHandle(username: string | null | undefined): string {
   if (!username) return "downloadit";
@@ -59,33 +74,124 @@ async function cleanupDir(tmpDir: string, requestId: string): Promise<void> {
 }
 
 // Fallback sweep for abandoned temp dirs (e.g. process killed mid-request).
-setInterval(() => {
-  (async () => {
-    try {
-      const base = tmpdir();
-      const entries = await readdir(base);
-      const now = Date.now();
-      for (const entry of entries) {
-        if (!entry.startsWith("downloadit-audio-")) continue;
-        const full = join(base, entry);
-        try {
-          const st = await stat(full);
-          if (now - st.mtimeMs > STALE_DIR_TTL_MS) {
-            await rm(full, { recursive: true, force: true });
-            logger.info("[AUDIO] swept stale temp dir", { dir: entry });
-          }
-        } catch {
-          /* ignore per-entry errors */
+// Registered (not a bare setInterval) so it is unref'd — it must never be the
+// reason the process stays alive — and is cleared deterministically on
+// shutdown. Disabled on serverless, where there is no long-lived process.
+scheduleBackgroundTask("audio-temp-sweep", SWEEP_INTERVAL_MS, async () => {
+  try {
+    const base = tmpdir();
+    const entries = await readdir(base);
+    const now = Date.now();
+    for (const entry of entries) {
+      if (!entry.startsWith("downloadit-audio-")) continue;
+      const full = join(base, entry);
+      try {
+        const st = await stat(full);
+        if (now - st.mtimeMs > STALE_DIR_TTL_MS) {
+          await rm(full, { recursive: true, force: true });
+          logger.info("[AUDIO] swept stale temp dir", { dir: entry });
         }
+      } catch {
+        /* ignore per-entry errors */
       }
-    } catch {
-      /* ignore sweep errors */
     }
-  })();
-}, SWEEP_INTERVAL_MS);
+  } catch {
+    /* ignore sweep errors */
+  }
+});
 
 router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
   const requestId = randomBytes(16).toString("hex");
+  const ip = getClientIp(req);
+
+  // --- Cheap phase: shape, rate limit and URL validation run BEFORE any
+  // capacity is consumed. A malformed request must never be able to occupy an
+  // audio slot, an FFmpeg slot, or a temp directory.
+  const contentLength = req.headers["content-length"];
+  if (contentLength && parseInt(contentLength, 10) > 1024) {
+    res.status(413).json(createErrorResponse("REQUEST_TOO_LARGE"));
+    return;
+  }
+  const contentTypeHeader = req.headers["content-type"];
+  if (!contentTypeHeader || !contentTypeHeader.includes("application/json")) {
+    res.status(400).json(createErrorResponse("VALIDATION_ERROR"));
+    return;
+  }
+  const body = req.body;
+  if (!body || typeof body !== "object" || !("url" in body)) {
+    res.status(400).json(createErrorResponse("VALIDATION_ERROR"));
+    return;
+  }
+  const { url } = body as { url: unknown };
+  if (typeof url !== "string") {
+    res.status(400).json(createErrorResponse("VALIDATION_ERROR"));
+    return;
+  }
+  const rateLimitResult = checkRateLimit(`audio:${ip}`, routeRateLimitConfig("audio"));
+  if (!rateLimitResult.allowed) {
+    logger.warn("[AUDIO] rate limit exceeded", { requestId, ip });
+    res.setHeader("Retry-After", String(Math.ceil(rateLimitResult.retryAfterMs / 1000)));
+    res.status(429).json(createErrorResponse("RATE_LIMITED"));
+    return;
+  }
+  const validation = validateInstagramUrl(url);
+  if (!validation.valid || !validation.parsed) {
+    logger.info("[AUDIO] URL validation failed", { requestId, error: validation.error });
+    res.status(400).json(createErrorResponse("INVALID_URL"));
+    return;
+  }
+  const parsed = validation.parsed;
+
+  // A client that navigates away mid-transcode must not keep a download
+  // running and an FFmpeg child alive. Listen on `res`, not `req`: `req`
+  // emits "close" as soon as the POST body is consumed, which is not a
+  // disconnect.
+  const controller = new AbortController();
+  const onClose = (): void => {
+    if (!res.writableEnded) controller.abort();
+  };
+  res.on("close", onClose);
+
+  // Per-IP admission first (cheap), then the global audio gate. A full gate
+  // produces a controlled 503 rather than an unbounded queue.
+  if (!perIpAudio.tryAcquire(ip)) {
+    res.off("close", onClose);
+    res.setHeader("Retry-After", "3");
+    res.status(503).json(createErrorResponse("CAPACITY_EXHAUSTED"));
+    return;
+  }
+
+  try {
+    await audioGate.run(
+      () => handleAudioRequest(req, res, requestId, ip, parsed, controller.signal),
+      { signal: controller.signal }
+    );
+  } catch (error) {
+    if (res.headersSent) {
+      res.destroy();
+      return;
+    }
+    if (error instanceof AppError) {
+      res.setHeader("Retry-After", "3");
+      res.status(error.statusCode).json(error.toResponse());
+      return;
+    }
+    const mapped = toAppError(error, "AUDIO_UNAVAILABLE");
+    res.status(mapped.statusCode).json(mapped.toResponse());
+  } finally {
+    res.off("close", onClose);
+    perIpAudio.release(ip);
+  }
+});
+
+async function handleAudioRequest(
+  req: Request,
+  res: ExpressResponse,
+  requestId: string,
+  ip: string,
+  parsed: ParsedInstagramUrl,
+  signal: AbortSignal
+): Promise<void> {
   const startTime = Date.now();
   const tmpDir = join(tmpdir(), `downloadit-audio-${requestId}`);
   const inputPath = join(tmpDir, "input.mp4");
@@ -93,7 +199,7 @@ router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
   let dirCreated = false;
 
   try {
-    logger.info("[AUDIO] requested", { requestId, ip: getClientIp(req) });
+    logger.info("[AUDIO] requested", { requestId, ip });
 
     // --- 1. FFmpeg availability (resolved from ffmpeg-static, not PATH) ---
     const ffmpegOk = await isFfmpegAvailable();
@@ -110,64 +216,18 @@ router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
       return;
     }
 
-    // Bounded concurrency: fail fast instead of stacking unlimited FFmpeg jobs.
-    if (activeAudioJobs >= MAX_CONCURRENT_AUDIO_JOBS) {
-      logger.warn("[AUDIO] overloaded", { requestId, active: activeAudioJobs });
-      const overloaded = createError("SERVER_OVERLOADED");
-      res.status(overloaded.statusCode).json(overloaded.toResponse());
-      return;
-    }
-    activeAudioJobs++;
-
-    // --- 2. Validate body ---
-    const contentLength = req.headers["content-length"];
-    if (contentLength && parseInt(contentLength, 10) > 1024) {
-      res.status(413).json(createErrorResponse("REQUEST_TOO_LARGE"));
-      return;
-    }
-    const contentTypeHeader = req.headers["content-type"];
-    if (!contentTypeHeader || !contentTypeHeader.includes("application/json")) {
-      res.status(400).json(createErrorResponse("VALIDATION_ERROR"));
-      return;
-    }
-    const body = req.body;
-    if (!body || typeof body !== "object" || !("url" in body)) {
-      res.status(400).json(createErrorResponse("VALIDATION_ERROR"));
-      return;
-    }
-    const { url } = body as { url: unknown };
-    if (typeof url !== "string") {
-      res.status(400).json(createErrorResponse("VALIDATION_ERROR"));
-      return;
-    }
-
-    // --- 3. Rate limit ---
-    const ip = getClientIp(req);
-    const rateLimitResult = checkRateLimit(`audio:${ip}`);
-    if (!rateLimitResult.allowed) {
-      logger.warn("[AUDIO] rate limit exceeded", { requestId, ip });
-      res.status(429).json(createErrorResponse("RATE_LIMITED"));
-      return;
-    }
-
-    // --- 4. Validate Instagram URL ---
-    const validation = validateInstagramUrl(url);
-    if (!validation.valid || !validation.parsed) {
-      logger.info("[AUDIO] URL validation failed", { requestId, error: validation.error });
-      res.status(400).json(createErrorResponse("INVALID_URL"));
-      return;
-    }
-
-    // --- 5. Resolve: dedicated audio lookup for audio pages, normal
+    // --- 2. Resolve: dedicated audio lookup for audio pages, normal
     // Reel/video resolve otherwise (shared cache, never duplicated) ---
-    logger.info("[AUDIO] resolving", { requestId, url: url.slice(0, 100) });
-    const result = await resolveUrl(validation.parsed.normalized);
+    // Body shape, rate limit and URL validation already ran before this slot
+    // was acquired.
+    logger.info("[AUDIO] resolving", { requestId, url: parsed.normalized.slice(0, 100) });
+    const result = await resolveUrl(parsed.normalized, undefined, { signal });
     const hasVideo = result.media.some((m) => m.type === "video");
     logger.info("[AUDIO] resolver result", {
       requestId,
-      detectedType: validation.parsed.contentType,
-      audioId: validation.parsed.audioId,
-      provider: result.type === "AUDIO" && validation.parsed.contentType === "AUDIO" ? "audio-lookup" : "resolver",
+      detectedType: parsed.contentType,
+      audioId: parsed.audioId,
+      provider: result.type === "AUDIO" && parsed.contentType === "AUDIO" ? "audio-lookup" : "resolver",
       type: result.type,
       mediaCount: result.media.length,
       hasVideo,
@@ -175,7 +235,7 @@ router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
       videoSourceFound: hasVideo,
     });
 
-    // --- 6. First usable source: direct audio file preferred, else video ---
+    // --- 3. First usable source: direct audio file preferred, else video ---
     const sourceItem = result.media.find(
       (m) => (m.type === "video" || m.type === "audio") && m.url && typeof m.url === "string"
     );
@@ -184,7 +244,7 @@ router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
       logger.warn("[AUDIO] no usable video found", { requestId });
       // An audio page with no resolvable source clip must get a clear audio
       // error — never the confusing "no video in this post" message.
-      const audioPage = result.type === "AUDIO" || validation.parsed.contentType === "AUDIO";
+      const audioPage = result.type === "AUDIO" || parsed.contentType === "AUDIO";
       if (audioPage) {
         const noSource = createError("AUDIO_NO_SOURCE");
         res.status(noSource.statusCode).json(noSource.toResponse());
@@ -234,8 +294,13 @@ router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
       timeoutMs: UPSTREAM_TIMEOUT_MS,
       tag: "AUDIO",
       requestId,
+      signal,
     });
 
+    if (upstream.kind === "client-gone") {
+      logger.info("[AUDIO] client gone before source download", { requestId });
+      return;
+    }
     if (upstream.kind === "timeout") {
       res.status(504).json(createErrorResponse("PROVIDER_TIMEOUT"));
       return;
@@ -286,12 +351,19 @@ router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
       return;
     }
     try {
+      // The source download is abortable: a client that leaves mid-transfer
+      // must not keep pulling 100 MB through the server to a dead socket.
       await pipeline(
         Readable.fromWeb(videoResponse.body as import("stream/web").ReadableStream<Uint8Array>),
-        createWriteStream(inputPath)
+        createWriteStream(inputPath),
+        { signal }
       );
     } catch (pipeErr) {
       if (pipeErr instanceof Error && pipeErr.name === "AbortError") {
+        if (signal.aborted) {
+          logger.info("[AUDIO] client gone during source download", { requestId });
+          return;
+        }
         logger.warn("[AUDIO] source download timed out", { requestId });
         res.status(504).json(createErrorResponse("PROVIDER_TIMEOUT"));
         return;
@@ -325,40 +397,57 @@ router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
         res.status(413).json(createErrorResponse("REQUEST_TOO_LARGE"));
         return;
       }
-      const audioBuffer = await readFile(inputPath).catch(() => null);
-      await cleanupDir(tmpDir, requestId);
-      dirCreated = false;
-      if (!audioBuffer || audioBuffer.length === 0) {
-        logger.error("[AUDIO] empty audio source", { requestId });
-        res.status(502).json(createErrorResponse("CONTENT_UNAVAILABLE"));
-        return;
-      }
       const safeHandle = sanitizeHandle(result.author?.username);
       const filename = `${safeHandle}-audio.mp3`;
-      const duration = Date.now() - startTime;
       logger.info("[AUDIO] complete", {
         requestId,
-        duration,
-        outputSize: audioBuffer.length,
+        duration: Date.now() - startTime,
+        outputSize: inputBytes,
         finalResult: "direct-mp3",
       });
       res.setHeader("Content-Type", "audio/mpeg");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      res.setHeader("Content-Length", String(audioBuffer.length));
+      res.setHeader("Content-Length", String(inputBytes));
       res.setHeader("Cache-Control", "no-store");
       res.setHeader("X-Request-Id", requestId);
-      res.send(audioBuffer);
+      // Streamed from disk: a 20 MB MP3 must not be buffered in process memory
+      // per concurrent request.
+      await pipeline(createReadStream(inputPath), res).catch((err) => {
+        logger.warn("[AUDIO] client aborted mp3 delivery", {
+          requestId,
+          error: err instanceof Error ? err.message : "unknown",
+        });
+      });
       return;
     }
 
     // --- 9. FFmpeg extraction (audio only) ---
-    logger.info("[AUDIO] ffmpeg started", { requestId });
+    // The ffmpeg gate is the real child-process ceiling. Waiting for a slot is
+    // bounded; a full queue yields a controlled 503, never a process pile-up.
+    logger.info("[AUDIO] ffmpeg starting", { requestId });
     try {
-      await runFfmpeg(
-        ["-y", "-i", inputPath, "-vn", "-acodec", "libmp3lame", "-b:a", "192k", "-f", "mp3", outputPath],
-        FFMPEG_TIMEOUT_MS
+      await ffmpegGate.run(
+        () =>
+          runFfmpeg(
+            ["-y", "-i", inputPath, "-vn", "-acodec", "libmp3lame", "-b:a", "192k", "-f", "mp3", outputPath],
+            FFMPEG_TIMEOUT_MS,
+            signal
+          ),
+        { signal }
       );
     } catch (ffErr) {
+      if (ffErr instanceof AppError) {
+        logger.warn("[AUDIO] ffmpeg not admitted", { requestId, code: ffErr.code });
+        res.setHeader("Retry-After", "3");
+        res.status(ffErr.statusCode).json(ffErr.toResponse());
+        return;
+      }
+      if (ffErr instanceof Error && ffErr.name === "AbortError") {
+        // Caller vanished (disconnect/drain): kill the child, drop the temp
+        // files in `finally`, and write nothing.
+        logger.info("[AUDIO] ffmpeg cancelled", { requestId });
+        return;
+      }
       const exitCode = (ffErr as { exitCode?: unknown }).exitCode ?? "unknown";
       const stderr = (ffErr as { stderr?: unknown }).stderr ?? "";
       logger.error("[AUDIO] ffmpeg failed", {
@@ -373,34 +462,39 @@ router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
     }
     logger.info("[AUDIO] ffmpeg completed", { requestId });
 
-    const mp3Buffer = await readFile(outputPath).catch(() => null);
-    if (!mp3Buffer || mp3Buffer.length === 0) {
+    // Size is checked on disk before any byte is sent, so an oversized result
+    // is rejected without ever entering the response path.
+    const outputStat = await stat(outputPath).catch(() => null);
+    const outputBytes = outputStat?.size ?? 0;
+    if (outputBytes === 0) {
       logger.error("[AUDIO] ffmpeg produced no output", { requestId });
       res.status(502).json(createErrorResponse("AUDIO_UNAVAILABLE"));
       return;
     }
-    if (mp3Buffer.length > MAX_OUTPUT_BYTES) {
-      logger.warn("[AUDIO] output too large", { requestId, size: mp3Buffer.length });
+    if (outputBytes > MAX_OUTPUT_BYTES) {
+      logger.warn("[AUDIO] output too large", { requestId, size: outputBytes });
       res.status(413).json(createErrorResponse("REQUEST_TOO_LARGE"));
       return;
     }
 
-    // --- 10. Cleanup BEFORE responding (MP3 already in memory) ---
-    await cleanupDir(tmpDir, requestId);
-    dirCreated = false;
-
     const safeHandle = sanitizeHandle(result.author?.username);
     const filename = `${safeHandle}-audio.mp3`;
 
-    const duration = Date.now() - startTime;
-    logger.info("[AUDIO] complete", { requestId, duration, outputSize: mp3Buffer.length });
+    logger.info("[AUDIO] complete", { requestId, duration: Date.now() - startTime, outputSize: outputBytes });
 
     res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-Length", String(mp3Buffer.length));
+    res.setHeader("Content-Length", String(outputBytes));
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Request-Id", requestId);
-    res.send(mp3Buffer);
+    // Streamed from disk; the temp dir is removed by the finally below, so
+    // cleanup happens exactly once whether delivery succeeded or was aborted.
+    await pipeline(createReadStream(outputPath), res).catch((err) => {
+      logger.warn("[AUDIO] client aborted mp3 delivery", {
+        requestId,
+        error: err instanceof Error ? err.message : "unknown",
+      });
+    });
   } catch (error) {
     if (error instanceof AppError) {
       logger.warn("[AUDIO] error", {
@@ -408,22 +502,30 @@ router.post("/", async (req: Request, res: ExpressResponse): Promise<void> => {
         code: error.code,
         message: error.message,
       });
+      if (res.headersSent) {
+        res.destroy();
+        return;
+      }
+      if (error.statusCode === 503) res.setHeader("Retry-After", "3");
       res.status(error.statusCode).json(error.toResponse());
       return;
     }
+    const mapped = toAppError(error, "AUDIO_UNAVAILABLE");
     logger.error("[AUDIO] unexpected error", {
       requestId,
+      errorCode: mapped.code,
       error: error instanceof Error ? error.message : "unknown",
     });
     if (!res.headersSent) {
-      res.status(500).json(createErrorResponse("TEMPORARY_ERROR"));
+      res.status(mapped.statusCode).json(mapped.toResponse());
+    } else {
+      res.destroy();
     }
   } finally {
-    activeAudioJobs = Math.max(0, activeAudioJobs - 1);
     if (dirCreated) {
       await cleanupDir(tmpDir, requestId).catch(() => {});
     }
   }
-});
+}
 
 export default router;

@@ -73,6 +73,8 @@ export type ErrorCode =
   | "RESOLVER_FAILED"
   | "AUDIO_UNAVAILABLE"
   | "SERVER_OVERLOADED"
+  | "CAPACITY_EXHAUSTED"
+  | "SERVER_SHUTTING_DOWN"
   | "RATE_LIMITED"
   | "TEMPORARY_ERROR"
   | "PROVIDER_UNAVAILABLE"
@@ -102,9 +104,22 @@ export interface ResolverResult {
   media: MediaItem[];
 }
 
+export interface ResolveCallOptions {
+  /**
+   * Cancellation for the provider operation (client disconnect / shutdown).
+   * A provider must stop its expensive work when this aborts. Optional so
+   * existing providers stay source-compatible.
+   */
+  signal?: AbortSignal;
+}
+
 export interface InstagramResolver {
   name: string;
-  resolve(url: string, onProgress?: ResolveProgressCallback): Promise<ResolverResult>;
+  resolve(
+    url: string,
+    onProgress?: ResolveProgressCallback,
+    options?: ResolveCallOptions
+  ): Promise<ResolverResult>;
 }
 
 /**
@@ -118,11 +133,38 @@ export interface TempStoreEntry {
   media: MediaItem[];
   type?: InstagramContentType;
   createdAt: number;
+  /** Last read/write touch — protects active downloads from eviction. */
+  lastAccessAt?: number;
 }
 
 export interface RateLimitConfig {
   windowMs: number;
   maxRequests: number;
+}
+
+/** Per-workload concurrency state, surfaced by the readiness endpoint. */
+export interface WorkloadCapacity {
+  name: string;
+  limit: number;
+  inFlight: number;
+  queued: number;
+  peak: number;
+  admitted: number;
+  rejected: number;
+  reclaimed: number;
+  utilization: number;
+}
+
+/** Full capacity picture for one process, surfaced by the readiness endpoint. */
+export interface CapacitySnapshot {
+  workloads: WorkloadCapacity[];
+  memory: {
+    rssMb: number;
+    heapUsedMb: number;
+    heapTotalMb: number;
+  };
+  draining: boolean;
+  uptimeSeconds: number;
 }
 
 export interface LoggerContext {

@@ -3,6 +3,7 @@ import { isPrivateOrReservedHost, isCdnMediaHost } from "./providers/base.js";
 import { resolveUrl } from "./resolvers/index.js";
 import { validateInstagramUrl } from "./validators/instagram-url.js";
 import { logger } from "./logger.js";
+import { withRetry } from "./retry.js";
 
 function isInstagramHost(hostname: string): boolean {
   const h = hostname.toLowerCase();
@@ -86,13 +87,28 @@ function sameCdnIdentity(a: string, b: string): boolean {
   }
 }
 
+/**
+ * Client IP for rate limiting and per-client concurrency.
+ *
+ * `X-Forwarded-For` / `X-Real-IP` are attacker-controlled unless a trusted
+ * proxy actually rewrites them, so they are read ONLY when this process is
+ * explicitly configured to sit behind one (`TRUST_PROXY=true`, which makes
+ * Express resolve `req.ip` through the proxy chain via `app.set("trust
+ * proxy")`). With no proxy configured — the default — the socket address is
+ * the only trustworthy value, and forwarding headers are ignored entirely.
+ *
+ * Without this, one client could rotate the header to mint unlimited rate
+ * limit buckets and unlimited per-IP concurrency slots, which is both an
+ * abuse hole and a way to defeat the backpressure.
+ */
 export function getClientIp(req: Request): string {
-  return (
-    (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-    (req.headers["x-real-ip"] as string) ||
-    req.ip ||
-    "anonymous"
-  );
+  if (process.env.TRUST_PROXY === "true" || process.env.TRUST_PROXY === "1") {
+    const forwarded = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim();
+    if (forwarded) return forwarded;
+    const realIp = (req.headers["x-real-ip"] as string | undefined)?.trim();
+    if (realIp) return realIp;
+  }
+  return req.ip || req.socket?.remoteAddress || "anonymous";
 }
 
 export const UPSTREAM_HEADERS: Record<string, string> = {
@@ -108,6 +124,7 @@ const MAX_REDIRECTS = 5;
 export type UpstreamStatus =
   | { kind: "ok"; response: Response; finalUrl: string }
   | { kind: "timeout" }
+  | { kind: "client-gone" }
   | { kind: "bad-redirect"; location: string }
   | { kind: "network-error"; message: string };
 
@@ -121,23 +138,44 @@ export type UpstreamStatus =
 const RETRY_DELAY_MS = 400;
 
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    // A backoff sleep must never be the reason the process stays alive.
+    timer.unref?.();
+  });
 }
 
 export async function fetchUpstreamMedia(
   initialUrl: string,
-  options: { timeoutMs: number; rangeHeader?: string; tag: string; requestId: string }
+  options: {
+    timeoutMs: number;
+    rangeHeader?: string;
+    tag: string;
+    requestId: string;
+    /** Caller-owned cancellation (client disconnect / shutdown). */
+    signal?: AbortSignal;
+  }
 ): Promise<UpstreamStatus> {
-  const { timeoutMs, rangeHeader, tag, requestId } = options;
+  const { timeoutMs, rangeHeader, tag, requestId, signal } = options;
   let currentUrl = initialUrl;
+
+  if (signal?.aborted) {
+    return { kind: "client-gone" };
+  }
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     let response: Response | null = null;
     let hopFailure: UpstreamStatus | null = null;
 
     for (let attempt = 0; attempt <= 1; attempt++) {
+      // Timeout and caller cancellation are merged: a dead client must abort
+      // the upstream socket immediately instead of holding a connection (and
+      // its bandwidth) until the timeout expires.
       const controller = new AbortController();
+      const onExternalAbort = (): void => controller.abort();
+      signal?.addEventListener("abort", onExternalAbort, { once: true });
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      timeout.unref?.();
       try {
         const headers: Record<string, string> = { ...UPSTREAM_HEADERS };
         if (rangeHeader) {
@@ -152,6 +190,11 @@ export async function fetchUpstreamMedia(
         break;
       } catch (err) {
         clearTimeout(timeout);
+        if (signal?.aborted) {
+          logger.info(`[${tag}] client gone, upstream aborted`, { requestId });
+          hopFailure = { kind: "client-gone" };
+          break;
+        }
         if (err instanceof Error && err.name === "AbortError") {
           logger.warn(`[${tag}] upstream timeout`, { requestId, url: currentUrl.slice(0, 120) });
           hopFailure = { kind: "timeout" };
@@ -166,6 +209,8 @@ export async function fetchUpstreamMedia(
         logger.warn(`[${tag}] upstream network error`, { requestId, message });
         hopFailure = { kind: "network-error", message };
         break;
+      } finally {
+        signal?.removeEventListener("abort", onExternalAbort);
       }
     }
 
@@ -259,6 +304,7 @@ export async function fetchUpstreamMediaResilient(
     tag: string;
     requestId: string;
     sourceUrl?: unknown;
+    signal?: AbortSignal;
   }
 ): Promise<ResilientUpstreamResult> {
   const { sourceUrl, ...fetchOpts } = options;
@@ -266,6 +312,12 @@ export async function fetchUpstreamMediaResilient(
 
   if (first.kind !== "ok" || !REFRESHABLE_STATUSES.has(first.response.status)) {
     return { status: first, refreshed: false };
+  }
+
+  // A client that is already gone must not trigger an expensive re-resolve.
+  if (fetchOpts.signal?.aborted) {
+    await first.response.body?.cancel().catch(() => {});
+    return { status: { kind: "client-gone" }, refreshed: false };
   }
 
   if (typeof sourceUrl !== "string" || sourceUrl.length === 0) {
@@ -286,7 +338,12 @@ export async function fetchUpstreamMediaResilient(
 
   let freshUrl: string | null = null;
   try {
-    const result = await resolveUrl(validation.parsed.normalized, undefined, { bypassCache: true });
+    // Re-resolution is expensive browser work: bound it with the provider
+    // gate and abort it the moment the client leaves.
+    const result = await resolveUrl(validation.parsed.normalized, undefined, {
+      bypassCache: true,
+      signal: fetchOpts.signal,
+    });
     // Pick the refreshed candidate for the SAME media item: rotating CDN
     // signatures keep the media identity in host+pathname, so prefer the
     // item whose identity matches the expired URL. Blindly using media[0]
@@ -319,17 +376,61 @@ export async function fetchUpstreamMediaResilient(
     return { status: first, refreshed: false };
   }
 
-  const retry = await fetchUpstreamMedia(freshUrl, { ...fetchOpts });
+  // The refreshed fetch gets ONE bounded, jittered retry on a purely transient
+  // transport failure. A timeout is never retried (the caller's budget is
+  // already spent) and a client disconnect aborts immediately, so this can
+  // neither hang nor double the traffic for a dead client.
+  const retry = await withRetry(
+    async () => {
+      const attempt = await fetchUpstreamMedia(freshUrl as string, { ...fetchOpts });
+      if (attempt.kind === "network-error") {
+        throw new TransientUpstreamError();
+      }
+      return attempt;
+    },
+    {
+      attempts: 2,
+      isRetryable: (error) => error instanceof TransientUpstreamError,
+      signal: fetchOpts.signal,
+      logContext: { tag: options.tag, requestId: options.requestId },
+    }
+  ).catch((err) => {
+    logger.warn(`[${options.tag}] retry after refresh failed`, {
+      requestId: options.requestId,
+      error: err instanceof Error ? err.message : "unknown",
+    });
+    return fetchUpstreamMedia(freshUrl as string, { ...fetchOpts });
+  });
+
   return { status: retry, refreshed: true };
 }
 
+/** Marker for a purely transient upstream transport failure (safe to retry). */
+class TransientUpstreamError extends Error {
+  constructor() {
+    super("upstream transport failure");
+    this.name = "TransientUpstreamError";
+  }
+}
+
+/**
+ * Pump an upstream body to the client with backpressure.
+ *
+ * Memory safety: the loop only ever holds the current chunk plus at most one
+ * queued `write()` chunk — it respects `res.write()` backpressure by awaiting
+ * `drain` instead of buffering the whole body, so a slow client cannot grow
+ * process memory. The upstream reader is cancelled on client disconnect, on a
+ * write error, and when the byte cap is hit, so sockets and bandwidth are
+ * released immediately.
+ */
 export async function pipeUpstreamToClient(
   req: Request,
   res: ExpressResponse,
   body: ReadableStream<Uint8Array>,
   maxBytes: number,
   tag: string,
-  requestId: string
+  requestId: string,
+  signal?: AbortSignal
 ): Promise<{ completed: boolean; bytes: number }> {
   const reader = body.getReader();
   let totalBytes = 0;
@@ -344,6 +445,25 @@ export async function pipeUpstreamToClient(
     }
   };
   req.on("close", onClientClose);
+
+  // An external abort (server drain, gate abandonment) must also release the
+  // socket and the upstream bandwidth instead of streaming to completion.
+  const onExternalAbort = () => {
+    if (!finished) {
+      clientGone = true;
+      reader.cancel().catch(() => {});
+      if (!res.writableEnded) res.destroy();
+      logger.warn(`[${tag}] aborted mid-stream`, { requestId, bytes: totalBytes });
+    }
+  };
+  if (signal) {
+    if (signal.aborted) {
+      req.off("close", onClientClose);
+      await reader.cancel().catch(() => {});
+      return { completed: false, bytes: 0 };
+    }
+    signal.addEventListener("abort", onExternalAbort, { once: true });
+  }
 
   try {
     while (true) {
@@ -367,7 +487,21 @@ export async function pipeUpstreamToClient(
       try {
         const canContinue = res.write(value);
         if (!canContinue) {
-          await new Promise<void>((resolve) => res.once("drain", () => resolve()));
+          // A bounded wait: if the client stalls forever, treat it as gone
+          // rather than holding the slot, socket, and bandwidth indefinitely.
+          const drained = await new Promise<boolean>((resolve) => {
+            const onDrain = () => resolve(true);
+            const onClose = () => resolve(false);
+            res.once("drain", onDrain);
+            res.once("close", onClose);
+            res.once("error", onClose);
+            signal?.addEventListener("abort", () => resolve(false), { once: true });
+          });
+          if (!drained) {
+            finished = true;
+            await reader.cancel().catch(() => {});
+            return { completed: false, bytes: totalBytes };
+          }
         }
       } catch {
         finished = true;
@@ -377,5 +511,6 @@ export async function pipeUpstreamToClient(
     }
   } finally {
     req.off("close", onClientClose);
+    signal?.removeEventListener("abort", onExternalAbort);
   }
 }

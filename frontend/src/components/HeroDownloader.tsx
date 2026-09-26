@@ -1230,6 +1230,11 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
   const requestSeqRef = useRef(0);
   const watchdogRef = useRef<number | null>(null);
   const postAbortRef = useRef<AbortController | null>(null);
+  // URL currently being resolved (null when idle): used to swallow a
+  // duplicate submit of the SAME link while it is already in flight, so one
+  // user action never produces two API requests. A different URL still
+  // supersedes the in-flight request instead of being ignored.
+  const inFlightUrlRef = useRef<string | null>(null);
 
   const clearWatchdog = useCallback(() => {
     if (watchdogRef.current !== null) {
@@ -1306,6 +1311,12 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
         setState("ERROR");
         return;
       }
+      // Double-submit guard: the same link is already resolving — one user
+      // action must produce exactly one API request. (A different link still
+      // supersedes the in-flight one below.)
+      if (state === "PREPARING" && inFlightUrlRef.current === trimmed) {
+        return;
+      }
       // Single active request: supersede anything still in flight so rapid
       // clicks can never spawn parallel resolutions.
       invalidateRequest();
@@ -1313,6 +1324,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
       // it for Reel/Video -> MP3 while still updating the detected source tab.
       setAudioExtractionRequested(activeTab === "audio");
       const seq = ++requestSeqRef.current;
+      inFlightUrlRef.current = trimmed;
       setResult(null);
       setError("");
       setProgress(0);
@@ -1389,7 +1401,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
       });
       streamRef.current = handle;
     },
-    [url, t, activeTab, invalidateRequest, clearWatchdog, closeStream, onActiveTabChange]
+    [url, t, activeTab, state, invalidateRequest, clearWatchdog, closeStream, onActiveTabChange]
   );
 
   const isAudioMode = activeTab === "audio" || (audioExtractionRequested && state === "SUCCESS");
@@ -1444,7 +1456,7 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                 className="hero-title-a block text-balance break-words text-[32px] sm:text-[42px] xl:text-[48px] font-extrabold text-fg tracking-tight"
                 style={{ fontFamily: "var(--font-sans)" }}
               >
-                Instagram Downloader –
+                {"Instagram Video "}
               </span>
               <span
                 className="hero-title-b block text-balance break-words text-[28px] sm:text-[38px] xl:text-[44px] font-bold italic"
@@ -1456,12 +1468,12 @@ export default function HeroDownloader({ activeTab, onActiveTabChange }: HeroDow
                   backgroundClip: "text",
                 }}
               >
-                Reels, Videos, Photos &amp; Audio
+                Downloader
               </span>
             </h1>
 
             <p className="hero-subtitle animate-fade-in-up delay-200 mt-4 text-[16px] sm:text-[16px] leading-[1.65] text-fg-muted max-w-xl">
-              Download public Instagram Reels, videos, photos, stories and audio with Downloadit. Preview media and save it to your device quickly — no login required.
+              Download Instagram Reels, Videos &amp; Photos in HD — paste a public link and save public Reels, videos, photos, stories and audio to your phone or desktop with Downloadit. No login required.
             </p>
 
             {/* Hero Category Row — 5 types: Reels, Videos, Photos, Stories, Audio */}

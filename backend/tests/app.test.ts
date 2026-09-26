@@ -40,12 +40,36 @@ describe("App wiring (shared by local server and Vercel function)", () => {
     const res = await fetch(`${base}/api/health/ready`);
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.status).toBe("ok");
+    // Readiness reports whether the instance should receive new work, so it
+    // reports "ready" (and 503 + "draining" while shutting down) rather than
+    // the liveness string "ok".
+    expect(body.status).toBe("ready");
+    expect(body.draining).toBe(false);
     expect(typeof body.provider).toBe("string");
     expect(typeof body.ffmpegAvailable).toBe("boolean");
+    // Honest saturation visibility, with no secrets in the payload.
+    expect(body.capacity).toBeDefined();
     const raw = JSON.stringify(body).toLowerCase();
     expect(raw).not.toContain("api_key");
     expect(raw).not.toContain("apikey");
+  });
+
+  it("serves GET /api/health/capacity with per-workload limits", async () => {
+    const res = await fetch(`${base}/api/health/capacity`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      capacity: { workloads: Array<{ name: string; limit: number; inFlight: number }> };
+    };
+    const names = body.capacity.workloads.map((w) => w.name);
+    for (const expected of ["request", "resolve", "provider", "puppeteer", "audio", "ffmpeg", "stream", "download", "probe"]) {
+      expect(names).toContain(expected);
+    }
+    for (const w of body.capacity.workloads) {
+      // Every workload is bounded — nothing is unlimited.
+      expect(w.limit).toBeGreaterThan(0);
+      expect(Number.isFinite(w.limit)).toBe(true);
+      expect(w.inFlight).toBeGreaterThanOrEqual(0);
+    }
   });
 
   it("rejects invalid resolve payloads without touching the resolver", async () => {

@@ -98,11 +98,11 @@ export const en: Strings = {
     items: [
       {
         title: "Reels",
-        desc: "Short-form videos and trending reels, saved in full quality with zero compression.",
+        desc: "Download Instagram Reels in full quality — short-form videos and trending clips, saved without extra compression.",
       },
       {
         title: "Videos",
-        desc: "Standard video posts and IGTV content, ready to watch offline anywhere.",
+        desc: "Download Instagram Videos as MP4. Standard video posts and IGTV content, ready to watch offline anywhere.",
       },
       {
         title: "Photos",
@@ -184,15 +184,15 @@ export const en: Strings = {
       },
       {
         q: "How do I download Instagram audio as MP3?",
-        a: "Switch to the Audio tab, paste a public Reels or video link, and Downloadit extracts the sound as MP3. Works as Instagram reel audio downloader and music downloader online.",
+        a: "Switch to the Audio tab, paste a public Reels or video link, and Downloadit extracts the sound as an MP3 file you can play or save offline.",
       },
       {
         q: "What formats are supported?",
-        a: "Videos and Reels → MP4 (Instagram MP4 download), photos → JPG/PNG/WebP, audio → MP3 (Instagram MP3 download). Stories keep their original image or video format.",
+        a: "Videos and Reels are saved as MP4, photos as JPG, PNG or WebP, and extracted audio as MP3. Stories keep their original image or video format.",
       },
       {
         q: "Is Downloadit free and does it require login?",
-        a: "Yes, Downloadit is a free Instagram downloader online and an Instagram downloader no login tool. It works only with links you can view publicly without signing in.",
+        a: "Yes. Downloadit is free to use and needs no login, no app install and no account. It works only with public links you can already view in a browser without signing in.",
       },
       {
         q: "Why might a download fail for public content?",

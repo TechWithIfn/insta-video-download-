@@ -1,8 +1,10 @@
 import { Router, Request, Response as ExpressResponse } from "express";
 import { logger } from "../lib/logger.js";
-import { createError, createErrorResponse } from "../lib/errors.js";
+import { AppError, createError, createErrorResponse, toMediaAppError } from "../lib/errors.js";
 import { generateToken } from "../lib/crypto.js";
-import { checkRateLimit } from "../lib/rate-limit.js";
+import { checkRateLimit, routeRateLimitConfig } from "../lib/rate-limit.js";
+import { KeyedConcurrency, getGate } from "../lib/capacity.js";
+import { readBoundedInt } from "../lib/env.js";
 import {
   validateProxyUrl,
   getClientIp,
@@ -13,6 +15,15 @@ import {
 
 const MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024;
 const UPSTREAM_TIMEOUT_MS = 30_000;
+
+/**
+ * Downloads are long-lived and hold a socket plus a CDN connection for their
+ * whole duration, so they get their own workload budget (separate from
+ * streaming) plus a per-client cap: a single client cannot occupy every
+ * download slot with parallel range-free connections.
+ */
+const downloadGate = getGate("download");
+const perIpDownload = new KeyedConcurrency(readBoundedInt("MAX_CONCURRENT_DOWNLOADS_PER_IP", 2, 1, 16));
 
 function sanitizeDownloadFilename(raw: unknown, contentType: string): string {
   let base = typeof raw === "string" ? raw.toLowerCase().slice(0, 80) : "";
@@ -40,14 +51,69 @@ const router = Router();
 router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
   const requestId = generateToken();
   const routeStart = Date.now();
+  const ip = getClientIp(req);
+
+  // Client disconnect must cancel the upstream fetch/stream, not just stop
+  // writing: otherwise a saturated download slot is held for a dead socket.
+  // Listen on `res`, not `req` — `req` "close" fires as soon as a request body
+  // is consumed, which is not a disconnect.
+  const controller = new AbortController();
+  const onClose = (): void => {
+    if (!res.writableEnded) controller.abort();
+  };
+  res.on("close", onClose);
+
+  if (!perIpDownload.tryAcquire(ip)) {
+    res.off("close", onClose);
+    logger.warn("[DOWNLOAD] per-client download limit reached", { requestId, ip });
+    res.setHeader("Retry-After", "3");
+    res.status(503).json(createErrorResponse("CAPACITY_EXHAUSTED"));
+    return;
+  }
 
   try {
-    const ip = getClientIp(req);
+    await downloadGate.run(
+      () => handleDownload(req, res, requestId, routeStart, ip, controller.signal),
+      { signal: controller.signal }
+    );
+  } catch (error) {
+    if (res.headersSent) {
+      res.destroy();
+      return;
+    }
+    if (error instanceof AppError) {
+      if (error.statusCode === 503) res.setHeader("Retry-After", "3");
+      res.status(error.statusCode).json(error.toResponse());
+      return;
+    }
+    const mapped = toMediaAppError(error);
+    logger.error("[DOWNLOAD] proxy error", {
+      requestId,
+      errorCode: mapped.code,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    res.status(mapped.statusCode).json(mapped.toResponse());
+  } finally {
+    res.off("close", onClose);
+    perIpDownload.release(ip);
+  }
+});
+
+async function handleDownload(
+  req: Request,
+  res: ExpressResponse,
+  requestId: string,
+  routeStart: number,
+  ip: string,
+  signal: AbortSignal
+): Promise<void> {
+  try {
     logger.info("[DOWNLOAD] requested", { requestId, ip });
 
-    const rateLimitResult = checkRateLimit(`download:${ip}`);
+    const rateLimitResult = checkRateLimit(`download:${ip}`, routeRateLimitConfig("download"));
     if (!rateLimitResult.allowed) {
       logger.warn("[DOWNLOAD] rate limit exceeded", { requestId, ip });
+      res.setHeader("Retry-After", String(Math.ceil(rateLimitResult.retryAfterMs / 1000)));
       res.status(429).json(createErrorResponse("RATE_LIMITED"));
       return;
     }
@@ -73,6 +139,7 @@ router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
       tag: "DOWNLOAD",
       requestId,
       sourceUrl: req.query.source,
+      signal,
     });
     if (refreshed) {
       logger.info("[DOWNLOAD] serving from refreshed media URL", { requestId });
@@ -80,6 +147,10 @@ router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
 
     if (upstream.kind === "timeout") {
       res.status(504).json(createErrorResponse("PROVIDER_TIMEOUT"));
+      return;
+    }
+    if (upstream.kind === "client-gone") {
+      logger.info("[DOWNLOAD] client gone before stream", { requestId });
       return;
     }
     if (upstream.kind === "bad-redirect" || upstream.kind === "network-error") {
@@ -172,23 +243,33 @@ router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
     }
 
     logger.info("[DOWNLOAD] stream started", { requestId, filename });
-    const result = await pipeUpstreamToClient(req, res, response.body, MAX_DOWNLOAD_BYTES, "DOWNLOAD", requestId);
+    const result = await pipeUpstreamToClient(
+      req,
+      res,
+      response.body,
+      MAX_DOWNLOAD_BYTES,
+      "DOWNLOAD",
+      requestId,
+      signal
+    );
     logger.info("[DOWNLOAD] stream completed", {
       requestId,
       completed: result.completed,
       bytes: result.bytes,
     });
   } catch (error) {
+    const mapped = toMediaAppError(error);
     logger.error("[DOWNLOAD] proxy error", {
       requestId,
+      errorCode: mapped.code,
       error: error instanceof Error ? error.message : "unknown",
     });
     if (!res.headersSent) {
-      res.status(500).json(createErrorResponse("TEMPORARY_ERROR"));
+      res.status(mapped.statusCode).json(mapped.toResponse());
     } else {
       res.destroy();
     }
   }
-});
+}
 
 export default router;

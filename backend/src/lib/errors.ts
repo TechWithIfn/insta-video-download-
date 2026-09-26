@@ -102,6 +102,17 @@ export const ERRORS: Record<ErrorCode, { message: string; status: number; retrya
     status: 503,
     retryable: true,
   },
+  CAPACITY_EXHAUSTED: {
+    message:
+      "Downloadit is at capacity for this operation right now. Please try again in a few seconds.",
+    status: 503,
+    retryable: true,
+  },
+  SERVER_SHUTTING_DOWN: {
+    message: "Downloadit is restarting. Please try again in a few seconds.",
+    status: 503,
+    retryable: true,
+  },
   RATE_LIMITED: {
     message: "Too many requests. Please wait a moment before trying again.",
     status: 429,
@@ -203,6 +214,87 @@ export const ERRORS: Record<ErrorCode, { message: string; status: number; retrya
     retryable: true,
   },
 };
+
+/**
+ * Library-level errors that carry a `code` property but are NOT AppErrors —
+ * Puppeteer's ProtocolError/ConnectionClosedError, undici/DNS errors, Node
+ * socket errors, etc. Routing must map these to an honest error code instead
+ * of letting them fall through to the generic TEMPORARY_ERROR (which is what
+ * made a stale-browser failure look like an unexplained "temporary issue").
+ */
+const CONNECTION_LOST_RE =
+  /connection closed|target closed|session closed|browser has disconnected|page crashed|protocol error|websocket is not open/i;
+
+const TIMEOUT_RE = /^(abort|aborterror|timeouterror|timeout)$/i;
+
+const TIMEOUT_MESSAGE_RE =
+  /\b(timeout|timed out|page-body-timeout|the operation was aborted|aborted)\b/i;
+
+const NETWORK_MESSAGE_RE =
+  /\b(fetch failed|econnreset|econnrefused|enotfound|eai_again|socket hang up|other side closed|network error|getaddrinfo|undici)\b/i;
+
+/** True when the error means the browser/CDP transport died (stale handle). */
+export function isConnectionLostError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const name = error instanceof Error ? error.name : "";
+  const message = error instanceof Error ? error.message : String(error);
+  if (name === "ConnectionClosedError" || name === "ProtocolError") return true;
+  return CONNECTION_LOST_RE.test(message);
+}
+
+/** True when the error is an abort/timeout from an external request. */
+export function isTimeoutError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const name = error instanceof Error ? error.name : "";
+  const message = error instanceof Error ? error.message : String(error);
+  if (TIMEOUT_RE.test(name)) return true;
+  return TIMEOUT_MESSAGE_RE.test(message);
+}
+
+/** True when the error is a transport/DNS/socket failure reaching an upstream. */
+export function isNetworkError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const name = error instanceof Error ? error.name : "";
+  const code = typeof (error as { code?: unknown }).code === "string" ? (error as { code: string }).code : "";
+  const message = error instanceof Error ? error.message : String(error);
+  if (name === "TypeError" && /fetch failed/i.test(message)) return true;
+  if (code && /^(ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|EPIPE|UND_ERR)/i.test(code)) return true;
+  return NETWORK_MESSAGE_RE.test(message);
+}
+
+/**
+ * Normalize any thrown value into an AppError so routes can answer with an
+ * honest, specific code. Known shapes are mapped; genuinely unknown failures
+ * fall back to `fallbackCode` (TEMPORARY_ERROR) — the ONLY case where the
+ * generic message is allowed.
+ *
+ * The original error must still be logged by the caller: this only decides
+ * what the client is told.
+ */
+export function toAppError(error: unknown, fallbackCode: ErrorCode = "TEMPORARY_ERROR"): AppError {
+  if (error instanceof AppError) return error;
+
+  // A string/number ErrorCode thrown directly is still a known failure.
+  if (typeof error === "string" && error in ERRORS) {
+    return createError(error as ErrorCode);
+  }
+
+  if (isConnectionLostError(error)) return createError("PROVIDER_UNAVAILABLE");
+  if (isTimeoutError(error)) return createError("PROVIDER_TIMEOUT");
+  if (isNetworkError(error)) return createError("PROVIDER_UNAVAILABLE");
+
+  return createError(fallbackCode);
+}
+
+/** Media-transfer context: network failures read better as a download failure. */
+export function toMediaAppError(error: unknown): AppError {
+  if (error instanceof AppError) return error;
+  if (isTimeoutError(error)) return createError("PROVIDER_TIMEOUT");
+  if (isNetworkError(error) || isConnectionLostError(error)) {
+    return createError("MEDIA_DOWNLOAD_FAILED");
+  }
+  return toAppError(error, "MEDIA_DOWNLOAD_FAILED");
+}
 
 export function createError(code: ErrorCode): AppError {
   const { message, status } = ERRORS[code];

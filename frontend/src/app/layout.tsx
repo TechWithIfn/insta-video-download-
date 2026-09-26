@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Poppins, Lora } from "next/font/google";
 import Script from "next/script";
 import { LanguageProvider } from "@/i18n";
-import { BRAND_DESCRIPTION, BRAND_NAME, BRAND_TITLE, SITE_URL } from "@/config/site";
+import { BRAND_DESCRIPTION, BRAND_NAME, BRAND_TITLE, HOME_OG_IMAGE_ALT, SITE_URL } from "@/config/site";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     siteName: BRAND_NAME,
     url: SITE_URL,
     locale: "en_US",
-    images: [{ url: "/og-downloadit.png", width: 1200, height: 630, alt: "Downloadit — Instagram Downloader for Reels, Videos, Photos, and Audio" }],
+    images: [{ url: "/og-downloadit.png", width: 1200, height: 630, alt: HOME_OG_IMAGE_ALT }],
   },
   twitter: {
     card: "summary_large_image",
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/favicon.ico", sizes: "16x16 32x32 48x48" },
       { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
       { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
       { url: "/favicon-48x48.png", sizes: "48x48", type: "image/png" },

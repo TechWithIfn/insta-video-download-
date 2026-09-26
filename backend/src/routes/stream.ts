@@ -1,8 +1,10 @@
 import { Router, Request, Response as ExpressResponse } from "express";
 import { logger } from "../lib/logger.js";
-import { createError, createErrorResponse } from "../lib/errors.js";
+import { AppError, createError, createErrorResponse, toMediaAppError } from "../lib/errors.js";
 import { generateToken } from "../lib/crypto.js";
-import { checkRateLimit } from "../lib/rate-limit.js";
+import { checkRateLimit, routeRateLimitConfig } from "../lib/rate-limit.js";
+import { KeyedConcurrency, getGate } from "../lib/capacity.js";
+import { readBoundedInt } from "../lib/env.js";
 import {
   validateProxyUrl,
   getClientIp,
@@ -13,6 +15,15 @@ import {
 
 const MAX_STREAM_BYTES = 200 * 1024 * 1024;
 const UPSTREAM_TIMEOUT_MS = 30_000;
+
+/**
+ * Streaming has its own budget, independent of downloads: a video player
+ * holds a connection for a long time and browsers often open several range
+ * requests for one video, so a low per-IP cap plus a dedicated global gate is
+ * what keeps playback from starving everything else.
+ */
+const streamGate = getGate("stream");
+const perIpStream = new KeyedConcurrency(readBoundedInt("MAX_CONCURRENT_STREAMS_PER_IP", 3, 1, 16));
 
 interface ParsedRange {
   start: number;
@@ -53,7 +64,8 @@ async function pipeWithValidation(
   body: ReadableStream<Uint8Array>,
   maxBytes: number,
   tag: string,
-  requestId: string
+  requestId: string,
+  signal?: AbortSignal
 ): Promise<{ completed: boolean; bytes: number }> {
   const reader = body.getReader();
   let totalBytes = 0;
@@ -64,6 +76,11 @@ async function pipeWithValidation(
   const firstChunk: Uint8Array[] = [];
   let headroomBytes = 0;
 
+  const stop = (): void => {
+    if (finished) return;
+    clientGone = true;
+    reader.cancel().catch(() => {});
+  };
   const onClientClose = () => {
     if (!finished) {
       clientGone = true;
@@ -72,6 +89,21 @@ async function pipeWithValidation(
     }
   };
   req.on("close", onClientClose);
+  const onExternalAbort = () => {
+    if (!finished) {
+      logger.warn(`[${tag}] aborted mid-stream`, { requestId, bytes: totalBytes });
+      stop();
+      if (!res.writableEnded) res.destroy();
+    }
+  };
+  if (signal) {
+    if (signal.aborted) {
+      req.off("close", onClientClose);
+      await reader.cancel().catch(() => {});
+      return { completed: false, bytes: 0 };
+    }
+    signal.addEventListener("abort", onExternalAbort, { once: true });
+  }
 
   try {
     while (true) {
@@ -140,6 +172,7 @@ async function pipeWithValidation(
     }
   } finally {
     req.off("close", onClientClose);
+    signal?.removeEventListener("abort", onExternalAbort);
   }
 }
 
@@ -150,7 +183,8 @@ async function pipeRangeSlice(
   start: number,
   end: number | null,
   tag: string,
-  requestId: string
+  requestId: string,
+  signal?: AbortSignal
 ): Promise<number> {
   const reader = body.getReader();
   let skipped = 0;
@@ -163,7 +197,22 @@ async function pipeRangeSlice(
       reader.cancel().catch(() => {});
     }
   };
+  const onExternalAbort = () => {
+    if (!finished) {
+      clientGone = true;
+      reader.cancel().catch(() => {});
+      if (!res.writableEnded) res.destroy();
+    }
+  };
   req.on("close", onClientClose);
+  if (signal) {
+    if (signal.aborted) {
+      req.off("close", onClientClose);
+      await reader.cancel().catch(() => {});
+      return 0;
+    }
+    signal.addEventListener("abort", onExternalAbort, { once: true });
+  }
   try {
     while (true) {
       if (clientGone) return sent;
@@ -219,6 +268,7 @@ async function pipeRangeSlice(
     }
   } finally {
     req.off("close", onClientClose);
+    signal?.removeEventListener("abort", onExternalAbort);
   }
 }
 
@@ -226,14 +276,63 @@ const router = Router();
 
 router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
   const requestId = generateToken();
+  const ip = getClientIp(req);
+
+  const controller = new AbortController();
+  const onClose = (): void => {
+    if (!res.writableEnded) controller.abort();
+  };
+  res.on("close", onClose);
+
+  if (!perIpStream.tryAcquire(ip)) {
+    res.off("close", onClose);
+    logger.warn("[STREAM] per-client stream limit reached", { requestId, ip });
+    res.setHeader("Retry-After", "3");
+    res.status(503).json(createErrorResponse("CAPACITY_EXHAUSTED"));
+    return;
+  }
 
   try {
-    const ip = getClientIp(req);
+    await streamGate.run(() => handleStream(req, res, requestId, ip, controller.signal), {
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (res.headersSent) {
+      res.destroy();
+      return;
+    }
+    if (error instanceof AppError) {
+      if (error.statusCode === 503) res.setHeader("Retry-After", "3");
+      res.status(error.statusCode).json(error.toResponse());
+      return;
+    }
+    const mapped = toMediaAppError(error);
+    logger.error("[STREAM] proxy error", {
+      requestId,
+      errorCode: mapped.code,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    res.status(mapped.statusCode).json(mapped.toResponse());
+  } finally {
+    res.off("close", onClose);
+    perIpStream.release(ip);
+  }
+});
+
+async function handleStream(
+  req: Request,
+  res: ExpressResponse,
+  requestId: string,
+  ip: string,
+  signal: AbortSignal
+): Promise<void> {
+  try {
     logger.info("[STREAM] requested", { requestId, ip });
 
-    const rateLimitResult = checkRateLimit(`stream:${ip}`);
+    const rateLimitResult = checkRateLimit(`stream:${ip}`, routeRateLimitConfig("stream"));
     if (!rateLimitResult.allowed) {
       logger.warn("[STREAM] rate limit exceeded", { requestId, ip });
+      res.setHeader("Retry-After", String(Math.ceil(rateLimitResult.retryAfterMs / 1000)));
       res.status(429).json(createErrorResponse("RATE_LIMITED"));
       return;
     }
@@ -258,6 +357,7 @@ router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
       tag: "STREAM",
       requestId,
       sourceUrl: req.query.source,
+      signal,
     });
     if (refreshed) {
       logger.info("[STREAM] serving from refreshed media URL", { requestId });
@@ -265,6 +365,10 @@ router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
 
     if (upstream.kind === "timeout") {
       res.status(504).json(createErrorResponse("PROVIDER_TIMEOUT"));
+      return;
+    }
+    if (upstream.kind === "client-gone") {
+      logger.info("[STREAM] client gone before stream", { requestId });
       return;
     }
     if (upstream.kind === "bad-redirect" || upstream.kind === "network-error") {
@@ -338,7 +442,7 @@ router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
       if (contentLength) res.setHeader("Content-Length", contentLength);
       res.status(206);
       logger.info("[STREAM] forwarding 206 partial content", { requestId, contentRange });
-      const result = await pipeUpstreamToClient(req, res, response.body, MAX_STREAM_BYTES, "STREAM", requestId);
+      const result = await pipeUpstreamToClient(req, res, response.body, MAX_STREAM_BYTES, "STREAM", requestId, signal);
       logger.info("[STREAM] 206 stream completed", { requestId, bytes: result.bytes });
       return;
     }
@@ -365,7 +469,7 @@ router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
         start: clientRange.start,
         end,
       });
-      const sent = await pipeRangeSlice(req, res, response.body, clientRange.start, end, "STREAM", requestId);
+      const sent = await pipeRangeSlice(req, res, response.body, clientRange.start, end, "STREAM", requestId, signal);
       logger.info("[STREAM] sliced 206 completed", { requestId, bytes: sent });
       return;
     }
@@ -381,23 +485,25 @@ router.get("/", async (req: Request, res: ExpressResponse): Promise<void> => {
       res.setHeader("Content-Length", contentLength);
     }
     logger.info("[STREAM] full 200 stream started", { requestId });
-    const result = await pipeWithValidation(req, res, response.body, MAX_STREAM_BYTES, "STREAM", requestId);
+    const result = await pipeWithValidation(req, res, response.body, MAX_STREAM_BYTES, "STREAM", requestId, signal);
     logger.info("[STREAM] full stream completed", {
       requestId,
       completed: result.completed,
       bytes: result.bytes,
     });
   } catch (error) {
+    const mapped = toMediaAppError(error);
     logger.error("[STREAM] proxy error", {
       requestId,
+      errorCode: mapped.code,
       error: error instanceof Error ? error.message : "unknown",
     });
     if (!res.headersSent) {
-      res.status(500).json(createErrorResponse("TEMPORARY_ERROR"));
+      res.status(mapped.statusCode).json(mapped.toResponse());
     } else {
       res.destroy();
     }
   }
-});
+}
 
 export default router;
